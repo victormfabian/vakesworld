@@ -30,6 +30,39 @@
   overflow: hidden;
 }
 
+.page-loading-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+}
+
+.page-loading-indicator__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: loader-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes loader-pulse {
+  0%,
+  100% {
+    transform: scale(0.7);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
 .hero-card::after,
 .portal-card::after,
 .admin::after,
@@ -241,9 +274,9 @@
 }
 
 .modal__close {
-  position: absolute;
+  position: sticky;
   top: 12px;
-  right: 12px;
+  margin-left: auto;
   border: 0;
   border-radius: 999px;
   background: #ffffff;
@@ -251,6 +284,7 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   padding: 6px 12px;
+  z-index: 2;
 }
 
 .modal__meta {
@@ -301,6 +335,14 @@
   cursor: pointer;
   font-weight: 600;
   letter-spacing: 0.02em;
+}
+
+.service-summary::marker {
+  color: var(--accent);
+}
+
+.service-summary::-webkit-details-marker {
+  color: var(--accent);
 }
 
 .service-summary span {
@@ -524,9 +566,9 @@
 }
 
 .shop-detail__close {
-  position: absolute;
+  position: sticky;
   top: 12px;
-  right: 12px;
+  margin-left: auto;
   border: 0;
   background: #f1f1f1;
   border-radius: 999px;
@@ -534,6 +576,7 @@
   font-size: 0.7rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
+  z-index: 2;
 }
 
 .shop-detail__media {

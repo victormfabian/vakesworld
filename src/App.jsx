@@ -66,6 +66,8 @@ export default function App() {
     new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   )
   const todayDate = new Date().toISOString().slice(0, 10)
+  const defaultLogoUrl = new URL('./assets/vakes-logo.png', import.meta.url).href
+  const [heroMediaLoaded, setHeroMediaLoaded] = useState(false)
 
   const isSuccessKitPortal = (portal) => {
     const meta = portal?.meta?.toLowerCase() || ''
@@ -101,6 +103,13 @@ export default function App() {
     return id ? `https://www.youtube.com/embed/${id}` : ''
   }
 
+  const resolveHeroMediaUrl = (url) => {
+    if (!url || url.startsWith('/src/assets/')) {
+      return defaultLogoUrl
+    }
+    return url
+  }
+
   useEffect(() => {
     const handleHashChange = () => {
       setIsAdminView(window.location.hash === ADMIN_HASH)
@@ -113,6 +122,11 @@ export default function App() {
 
   useEffect(() => {
     if (!supabase) {
+      setSite(DEFAULT_SITE)
+      setPortals(DEFAULT_PORTALS)
+      setDraftSite(DEFAULT_SITE)
+      setDraftPortals(DEFAULT_PORTALS)
+      setHasLoadedContent(true)
       return
     }
 
@@ -264,6 +278,10 @@ export default function App() {
       setCheckoutStatus('')
     }
   }, [activePortal])
+
+  useEffect(() => {
+    setHeroMediaLoaded(false)
+  }, [site.logo_url])
 
   useEffect(() => {
     if (activePortal && isWorkWithMePortal(activePortal) && !workForm.date) {
@@ -1872,33 +1890,43 @@ export default function App() {
 
   return (
     <div className="page mx-auto max-w-3xl px-5 pb-10 pt-9 sm:px-6 sm:pb-16 sm:pt-12">
+      {!isAdminView && (!hasLoadedContent || !heroMediaLoaded) && (
+        <div className="page-loading-indicator" aria-label="Loading">
+          <div className="page-loading-indicator__dot"></div>
+        </div>
+      )}
       <header className="hero-card">
         <div className="hero-card__inner flex flex-col items-center text-center">
           <p className="hero-card__eyebrow">{site.hero_eyebrow}</p>
           <div className="mt-4">
-            {getYouTubeEmbedUrl(site.logo_url) ? (
+            {getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url)) ? (
               <div className="hero-video">
                 <iframe
-                  src={getYouTubeEmbedUrl(site.logo_url)}
+                  src={getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url))}
                   title="VAKES World"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
+                  onLoad={() => setHeroMediaLoaded(true)}
                 ></iframe>
               </div>
-            ) : isVideoUrl(site.logo_url) ? (
+            ) : isVideoUrl(resolveHeroMediaUrl(site.logo_url)) ? (
               <video
                 className="hero-logo h-auto w-[220px] max-w-full"
-                src={site.logo_url}
+                src={resolveHeroMediaUrl(site.logo_url)}
                 autoPlay
                 loop
                 muted
                 playsInline
+                onLoadedData={() => setHeroMediaLoaded(true)}
+                onError={() => setHeroMediaLoaded(true)}
               />
             ) : (
               <img
-                src={site.logo_url}
+                src={resolveHeroMediaUrl(site.logo_url)}
                 alt="VAKES World"
                 className="hero-logo h-auto w-[220px] max-w-full"
+                onLoad={() => setHeroMediaLoaded(true)}
+                onError={() => setHeroMediaLoaded(true)}
               />
             )}
           </div>
