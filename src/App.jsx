@@ -627,6 +627,17 @@ export default function App() {
     setDraftPortals(nextPortals)
   }
 
+  const handleServiceCarouselScroll = (event, direction) => {
+    const track = event.currentTarget
+      .closest('.service-carousel')
+      ?.querySelector('.service-carousel__track')
+    if (!track) {
+      return
+    }
+    const width = track.clientWidth
+    track.scrollBy({ left: width * direction, behavior: 'smooth' })
+  }
+
   const handleSuccessKitChange = (
     portalIndex,
     sectionKey,
@@ -1244,6 +1255,24 @@ export default function App() {
                                           serviceIndex,
                                           'image',
                                           event.target.value
+                                        )
+                                      }
+                                    />
+                                  </label>
+                                  <label className="admin__label">
+                                    Media URLs (comma separated)
+                                    <input
+                                      className="admin__input"
+                                      value={(service.media || []).join(', ')}
+                                      onChange={(event) =>
+                                        handleServiceChange(
+                                          index,
+                                          serviceIndex,
+                                          'media',
+                                          event.target.value
+                                            .split(',')
+                                            .map((value) => value.trim())
+                                            .filter(Boolean)
                                         )
                                       }
                                     />
@@ -1892,7 +1921,13 @@ export default function App() {
     <div className="page mx-auto max-w-3xl px-5 pb-10 pt-9 sm:px-6 sm:pb-16 sm:pt-12">
       {!isAdminView && (!hasLoadedContent || !heroMediaLoaded) && (
         <div className="page-loading-indicator" aria-label="Loading">
-          <div className="page-loading-indicator__dot"></div>
+          <svg
+            className="page-loading-indicator__triangle"
+            viewBox="0 0 48 42"
+            aria-hidden="true"
+          >
+            <path d="M24 2 L46 40 H2 Z" />
+          </svg>
         </div>
       )}
       <header className="hero-card">
@@ -2036,23 +2071,74 @@ export default function App() {
                       <span>{service.title}</span>
                     </summary>
                     <div className="service-body">
-                      {service.image &&
-                        (isVideoUrl(service.image) ? (
-                          <video
-                            className="service-image"
-                            src={service.image}
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
-                          />
-                        ) : (
-                          <img
-                            src={service.image}
-                            alt={service.title}
-                            className="service-image"
-                          />
-                        ))}
+                      {(() => {
+                        const mediaItems = service.media?.length
+                          ? service.media
+                          : service.image
+                            ? [service.image]
+                            : []
+                        if (!mediaItems.length) {
+                          return null
+                        }
+                        return (
+                          <div className="service-carousel">
+                            {mediaItems.length > 1 && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="service-carousel__nav service-carousel__nav--prev"
+                                  onClick={(event) =>
+                                    handleServiceCarouselScroll(event, -1)
+                                  }
+                                  aria-label="Previous media"
+                                >
+                                  Prev
+                                </button>
+                                <button
+                                  type="button"
+                                  className="service-carousel__nav service-carousel__nav--next"
+                                  onClick={(event) =>
+                                    handleServiceCarouselScroll(event, 1)
+                                  }
+                                  aria-label="Next media"
+                                >
+                                  Next
+                                </button>
+                              </>
+                            )}
+                            <div className="service-carousel__track">
+                              {mediaItems.map((item, mediaIndex) => {
+                                const youtubeUrl = getYouTubeEmbedUrl(item)
+                                return (
+                                  <div
+                                    className="service-carousel__item"
+                                    key={`${item}-${mediaIndex}`}
+                                  >
+                                    {youtubeUrl ? (
+                                      <iframe
+                                        src={youtubeUrl}
+                                        title={service.title}
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                      ></iframe>
+                                    ) : isVideoUrl(item) ? (
+                                      <video
+                                        src={item}
+                                        autoPlay
+                                        loop
+                                        muted
+                                        playsInline
+                                      />
+                                    ) : (
+                                      <img src={item} alt={service.title} />
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })()}
                       {service.description && (
                         <p className="service-description">
                           {service.description}

@@ -32,34 +32,39 @@
 
 .page-loading-indicator {
   position: fixed;
-  top: 20px;
-  right: 20px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
+  inset: 0;
   display: grid;
   place-items: center;
   z-index: 1000;
+  background: rgba(0, 0, 0, 0.3);
 }
 
-.page-loading-indicator__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: loader-pulse 0.9s ease-in-out infinite;
+.page-loading-indicator__triangle {
+  width: 46px;
+  height: 40px;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 150;
+  stroke-dashoffset: 150;
+  animation: loader-triangle 1.2s ease-in-out infinite;
+  transform: scaleY(-1);
 }
 
-@keyframes loader-pulse {
-  0%,
-  100% {
-    transform: scale(0.7);
-    opacity: 0.6;
+@keyframes loader-triangle {
+  0% {
+    stroke-dashoffset: -150;
+    opacity: 0.4;
   }
-  50% {
-    transform: scale(1.2);
+  60% {
+    stroke-dashoffset: 0;
     opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 150;
+    opacity: 0.4;
   }
 }
 
@@ -277,6 +282,8 @@
   position: sticky;
   top: 12px;
   margin-left: auto;
+  display: block;
+  width: fit-content;
   border: 0;
   border-radius: 999px;
   background: #ffffff;
@@ -361,6 +368,62 @@
   width: 100%;
   border-radius: 12px;
   display: block;
+}
+
+.service-carousel {
+  position: relative;
+}
+
+.service-carousel__track {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding-bottom: 6px;
+}
+
+.service-carousel__item {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f7f7f7;
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+}
+
+.service-carousel__item img,
+.service-carousel__item video,
+.service-carousel__item iframe {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border: 0;
+}
+
+.service-carousel__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.service-carousel__nav--prev {
+  left: 8px;
+}
+
+.service-carousel__nav--next {
+  right: 8px;
 }
 
 .service-description {
@@ -569,6 +632,8 @@
   position: sticky;
   top: 12px;
   margin-left: auto;
+  display: block;
+  width: fit-content;
   border: 0;
   background: #f1f1f1;
   border-radius: 999px;
