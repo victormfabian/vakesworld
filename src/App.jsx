@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   DEFAULT_PORTALS,
   DEFAULT_SITE,
@@ -62,6 +62,7 @@ export default function App() {
   })
   const [workFormError, setWorkFormError] = useState('')
   const [workFormStatus, setWorkFormStatus] = useState('')
+  const [workFormFieldErrors, setWorkFormFieldErrors] = useState({})
   const [currentTime, setCurrentTime] = useState(
     new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   )
@@ -69,6 +70,7 @@ export default function App() {
   const defaultLogoUrl = new URL('./assets/vakes-logo.png', import.meta.url).href
   const [heroMediaLoaded, setHeroMediaLoaded] = useState(false)
   const [serviceCarouselIndex, setServiceCarouselIndex] = useState({})
+  const serviceSwipeState = useRef({})
 
   const isSuccessKitPortal = (portal) => {
     const meta = portal?.meta?.toLowerCase() || ''
@@ -708,6 +710,59 @@ export default function App() {
     })
   }
 
+  const handleServiceCarouselPointerDown = (key, event) => {
+    if (!event.isPrimary) {
+      return
+    }
+    serviceSwipeState.current[key] = {
+      startX: event.clientX,
+      pointerId: event.pointerId,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const handleServiceCarouselPointerUp = (key, total, event) => {
+    if (!event.isPrimary) {
+      return
+    }
+    const start = serviceSwipeState.current[key]
+    if (!start) {
+      return
+    }
+    const deltaX = event.clientX - start.startX
+    delete serviceSwipeState.current[key]
+    const threshold = 40
+    if (Math.abs(deltaX) < threshold) {
+      return
+    }
+    const direction = deltaX > 0 ? -1 : 1
+    handleServiceCarouselStep(key, total, direction)
+  }
+
+  const handleServiceCarouselPointerCancel = (key, event) => {
+    if (!event.isPrimary) {
+      return
+    }
+    delete serviceSwipeState.current[key]
+  }
+
+  const preventContextMenu = (event) => {
+    event.preventDefault()
+  }
+
+  const preventDragStart = (event) => {
+    event.preventDefault()
+  }
+
+  const handleStartProjectClick = () => {
+    const portalIndex = portals.findIndex((portal) => isWorkWithMePortal(portal))
+    if (portalIndex === -1) {
+      return
+    }
+    setActivePortal(portals[portalIndex])
+    setActivePortalIndex(portalIndex)
+  }
+
   const handleSuccessKitChange = (
     portalIndex,
     sectionKey,
@@ -930,6 +985,24 @@ export default function App() {
   }
 
   const handleWorkFormSubmit = async () => {
+    const fieldErrors = {}
+    if (!workForm.service) fieldErrors.service = true
+    if (!workForm.name.trim()) fieldErrors.name = true
+    if (!workForm.industry) fieldErrors.industry = true
+    if (!workForm.email.trim()) fieldErrors.email = true
+    if (!workForm.phone.trim()) fieldErrors.phone = true
+    if (!workForm.message.trim()) fieldErrors.message = true
+    if (!workForm.agreement) fieldErrors.agreement = true
+    if (!workForm.date) fieldErrors.date = true
+    if (!workForm.time) fieldErrors.time = true
+    if (!workForm.timezone) fieldErrors.timezone = true
+    if (!workForm.meeting_mode) fieldErrors.meeting_mode = true
+    if (Object.keys(fieldErrors).length) {
+      setWorkFormFieldErrors(fieldErrors)
+      setWorkFormError('Fill in all required fields.')
+      return
+    }
+
     const hasRequired =
       workForm.service &&
       workForm.name.trim() &&
@@ -943,16 +1016,12 @@ export default function App() {
       workForm.timezone &&
       workForm.meeting_mode
 
-    if (!hasRequired) {
-      setWorkFormError('Fill in all required fields.')
-      return
-    }
-
     if (!supabase) {
       setWorkFormError('Submission is unavailable right now.')
       return
     }
 
+    setWorkFormFieldErrors({})
     setWorkFormError('')
     setWorkFormStatus('Submitting...')
 
@@ -979,6 +1048,18 @@ export default function App() {
     }
 
     setWorkFormStatus('Request submitted. We will reach out soon.')
+  }
+
+  const updateWorkFormField = (field, value) => {
+    setWorkForm((prevForm) => ({ ...prevForm, [field]: value }))
+    setWorkFormFieldErrors((prevErrors) => {
+      if (!prevErrors[field]) {
+        return prevErrors
+      }
+      const nextErrors = { ...prevErrors }
+      delete nextErrors[field]
+      return nextErrors
+    })
   }
 
   if (isAdminView) {
@@ -2033,7 +2114,7 @@ export default function App() {
           <p className="hero-card__eyebrow">{site.hero_eyebrow}</p>
           <div className="mt-4">
             {getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url)) ? (
-              <div className="hero-video">
+              <div className="hero-video media-protect" onContextMenu={preventContextMenu}>
                 <iframe
                   src={getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url))}
                   title="VAKES World"
@@ -2050,8 +2131,12 @@ export default function App() {
                 loop
                 muted
                 playsInline
+                controlsList="nodownload noplaybackrate noremoteplayback"
+                disablePictureInPicture
+                disableRemotePlayback
                 onLoadedData={() => setHeroMediaLoaded(true)}
                 onError={() => setHeroMediaLoaded(true)}
+                onContextMenu={preventContextMenu}
               />
             ) : (
               <img
@@ -2060,6 +2145,9 @@ export default function App() {
                 className="hero-logo h-auto w-[220px] max-w-full"
                 onLoad={() => setHeroMediaLoaded(true)}
                 onError={() => setHeroMediaLoaded(true)}
+                onContextMenu={preventContextMenu}
+                onDragStart={preventDragStart}
+                draggable={false}
               />
             )}
           </div>
@@ -2180,7 +2268,23 @@ export default function App() {
                         const youtubeUrl = getYouTubeEmbedUrl(currentItem)
                         return (
                           <div className="service-carousel">
-                            <div className="service-carousel__viewport">
+                          <div
+                              className="service-carousel__viewport media-protect"
+                              onPointerDown={(event) =>
+                                handleServiceCarouselPointerDown(key, event)
+                              }
+                              onPointerUp={(event) =>
+                                handleServiceCarouselPointerUp(
+                                  key,
+                                  mediaItems.length,
+                                  event
+                                )
+                              }
+                              onPointerCancel={(event) =>
+                                handleServiceCarouselPointerCancel(key, event)
+                              }
+                              onContextMenu={preventContextMenu}
+                            >
                               <div className="service-carousel__item">
                                 {!currentItem ? (
                                   <div className="service-carousel__placeholder">
@@ -2201,9 +2305,19 @@ export default function App() {
                                     muted
                                     playsInline
                                     controls
+                                    controlsList="nodownload noplaybackrate noremoteplayback"
+                                    disablePictureInPicture
+                                    disableRemotePlayback
+                                    onContextMenu={preventContextMenu}
                                   />
                                 ) : (
-                                  <img src={currentItem} alt={service.title} />
+                                  <img
+                                    src={currentItem}
+                                    alt={service.title}
+                                    onContextMenu={preventContextMenu}
+                                    onDragStart={preventDragStart}
+                                    draggable={false}
+                                  />
                                 )}
                               </div>
                             </div>
@@ -2253,10 +2367,23 @@ export default function App() {
                           </div>
                         )
                       })()}
-                      {service.description && (
-                        <p className="service-description">
-                          {service.description}
-                        </p>
+                      {(service.description || portals.some(isWorkWithMePortal)) && (
+                        <div className="service-description-row">
+                          {service.description && (
+                            <p className="service-description">
+                              {service.description}
+                            </p>
+                          )}
+                          {portals.some(isWorkWithMePortal) && (
+                            <button
+                              type="button"
+                              className="service-cta"
+                              onClick={handleStartProjectClick}
+                            >
+                              Start a project
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </details>
@@ -2342,9 +2469,18 @@ export default function App() {
                       )
                       .map((item, itemIndex) => (
                         <div className="shop-card" key={`${item.title}-${itemIndex}`}>
-                          <div className="shop-card__media">
+                          <div
+                            className="shop-card__media media-protect"
+                            onContextMenu={preventContextMenu}
+                          >
                             {item.image ? (
-                              <img src={item.image} alt={item.title} />
+                              <img
+                                src={item.image}
+                                alt={item.title}
+                                onContextMenu={preventContextMenu}
+                                onDragStart={preventDragStart}
+                                draggable={false}
+                              />
                             ) : (
                               <div className="shop-card__placeholder">Image</div>
                             )}
@@ -2381,12 +2517,15 @@ export default function App() {
             {isWorkWithMePortal(activePortal) && (
               <div className="work-form">
                 <div className="work-form__grid">
-                  <label className="work-form__label">
+                  <label
+                    className={`work-form__label${workFormFieldErrors.service ? ' work-form__label--error' : ''}`}
+                  >
                     Service
                     <select
+                      className={`work-form__input${workFormFieldErrors.service ? ' work-form__input--error' : ''}`}
                       value={workForm.service}
                       onChange={(event) =>
-                        setWorkForm({ ...workForm, service: event.target.value })
+                        updateWorkFormField('service', event.target.value)
                       }
                       required
                     >
@@ -2397,23 +2536,35 @@ export default function App() {
                         </option>
                       ))}
                     </select>
+                    {workFormFieldErrors.service && (
+                      <span className="work-form__hint">Required</span>
+                    )}
                   </label>
-                  <label className="work-form__label">
+                  <label
+                    className={`work-form__label${workFormFieldErrors.name ? ' work-form__label--error' : ''}`}
+                  >
                     Name
                     <input
+                      className={`work-form__input${workFormFieldErrors.name ? ' work-form__input--error' : ''}`}
                       value={workForm.name}
                       onChange={(event) =>
-                        setWorkForm({ ...workForm, name: event.target.value })
+                        updateWorkFormField('name', event.target.value)
                       }
                       required
                     />
+                    {workFormFieldErrors.name && (
+                      <span className="work-form__hint">Required</span>
+                    )}
                   </label>
-                  <label className="work-form__label">
+                  <label
+                    className={`work-form__label${workFormFieldErrors.industry ? ' work-form__label--error' : ''}`}
+                  >
                     Profession / Industry
                     <select
+                      className={`work-form__input${workFormFieldErrors.industry ? ' work-form__input--error' : ''}`}
                       value={workForm.industry}
                       onChange={(event) =>
-                        setWorkForm({ ...workForm, industry: event.target.value })
+                        updateWorkFormField('industry', event.target.value)
                       }
                       required
                     >
@@ -2424,94 +2575,134 @@ export default function App() {
                         </option>
                       ))}
                     </select>
+                    {workFormFieldErrors.industry && (
+                      <span className="work-form__hint">Required</span>
+                    )}
                   </label>
                   <label className="work-form__label">
                     Other
                     <input
+                      className="work-form__input"
                       value={workForm.other}
                       onChange={(event) =>
-                        setWorkForm({ ...workForm, other: event.target.value })
+                        updateWorkFormField('other', event.target.value)
                       }
                     />
                   </label>
-                  <label className="work-form__label">
+                  <label
+                    className={`work-form__label${workFormFieldErrors.email ? ' work-form__label--error' : ''}`}
+                  >
                     Email
                     <input
+                      className={`work-form__input${workFormFieldErrors.email ? ' work-form__input--error' : ''}`}
                       type="email"
                       value={workForm.email}
                       onChange={(event) =>
-                        setWorkForm({ ...workForm, email: event.target.value })
+                        updateWorkFormField('email', event.target.value)
                       }
                       required
                     />
+                    {workFormFieldErrors.email && (
+                      <span className="work-form__hint">Required</span>
+                    )}
                   </label>
-                  <label className="work-form__label">
+                  <label
+                    className={`work-form__label${workFormFieldErrors.phone ? ' work-form__label--error' : ''}`}
+                  >
                     Phone number
                     <input
+                      className={`work-form__input${workFormFieldErrors.phone ? ' work-form__input--error' : ''}`}
                       value={workForm.phone}
                       onChange={(event) =>
-                        setWorkForm({ ...workForm, phone: event.target.value })
+                        updateWorkFormField('phone', event.target.value)
                       }
                       required
                     />
+                    {workFormFieldErrors.phone && (
+                      <span className="work-form__hint">Required</span>
+                    )}
                   </label>
-                  <label className="work-form__label work-form__label--full">
+                  <label
+                    className={`work-form__label work-form__label--full${workFormFieldErrors.message ? ' work-form__label--error' : ''}`}
+                  >
                     Message
                     <textarea
+                      className={`work-form__input${workFormFieldErrors.message ? ' work-form__input--error' : ''}`}
                       value={workForm.message}
                       onChange={(event) =>
-                        setWorkForm({ ...workForm, message: event.target.value })
+                        updateWorkFormField('message', event.target.value)
                       }
                       rows={4}
                       required
                     />
+                    {workFormFieldErrors.message && (
+                      <span className="work-form__hint">Required</span>
+                    )}
                   </label>
-                  <label className="work-form__label work-form__label--full work-form__checkbox">
+                  <label
+                    className={`work-form__label work-form__label--full work-form__checkbox${workFormFieldErrors.agreement ? ' work-form__label--error' : ''}`}
+                  >
                     <input
+                      className={`work-form__input${workFormFieldErrors.agreement ? ' work-form__input--error' : ''}`}
                       type="checkbox"
                       checked={workForm.agreement}
                       onChange={(event) =>
-                        setWorkForm({
-                          ...workForm,
-                          agreement: event.target.checked,
-                        })
+                        updateWorkFormField('agreement', event.target.checked)
                       }
                       required
                     />
                     <span>{getWorkFormConfig(activePortal).agreement_label}</span>
+                    {workFormFieldErrors.agreement && (
+                      <span className="work-form__hint">Required</span>
+                    )}
                   </label>
                 </div>
                 <div className="work-form__grid">
-                  <label className="work-form__label">
+                  <label
+                    className={`work-form__label${workFormFieldErrors.date ? ' work-form__label--error' : ''}`}
+                  >
                     Booking date
                     <input
+                      className={`work-form__input${workFormFieldErrors.date ? ' work-form__input--error' : ''}`}
                       type="date"
                       min={todayDate}
                       value={workForm.date}
                       onChange={(event) =>
-                        setWorkForm({ ...workForm, date: event.target.value })
+                        updateWorkFormField('date', event.target.value)
                       }
                       required
                     />
+                    {workFormFieldErrors.date && (
+                      <span className="work-form__hint">Required</span>
+                    )}
                   </label>
-                  <label className="work-form__label">
+                  <label
+                    className={`work-form__label${workFormFieldErrors.time ? ' work-form__label--error' : ''}`}
+                  >
                     Time
                     <input
+                      className={`work-form__input${workFormFieldErrors.time ? ' work-form__input--error' : ''}`}
                       type="time"
                       min={workForm.date === todayDate ? currentTime : undefined}
                       value={workForm.time}
                       onChange={(event) =>
-                        setWorkForm({ ...workForm, time: event.target.value })
+                        updateWorkFormField('time', event.target.value)
                       }
                       required
                     />
+                    {workFormFieldErrors.time && (
+                      <span className="work-form__hint">Required</span>
+                    )}
                   </label>
-                  <label className="work-form__label">
+                  <label
+                    className={`work-form__label${workFormFieldErrors.timezone ? ' work-form__label--error' : ''}`}
+                  >
                     Timezone
                     <select
+                      className={`work-form__input${workFormFieldErrors.timezone ? ' work-form__input--error' : ''}`}
                       value={workForm.timezone}
                       onChange={(event) =>
-                        setWorkForm({ ...workForm, timezone: event.target.value })
+                        updateWorkFormField('timezone', event.target.value)
                       }
                       required
                     >
@@ -2522,13 +2713,19 @@ export default function App() {
                         </option>
                       ))}
                     </select>
+                    {workFormFieldErrors.timezone && (
+                      <span className="work-form__hint">Required</span>
+                    )}
                   </label>
-                  <label className="work-form__label">
+                  <label
+                    className={`work-form__label${workFormFieldErrors.meeting_mode ? ' work-form__label--error' : ''}`}
+                  >
                     Mode of meeting
                     <select
+                      className={`work-form__input${workFormFieldErrors.meeting_mode ? ' work-form__input--error' : ''}`}
                       value={workForm.meeting_mode}
                       onChange={(event) =>
-                        setWorkForm({ ...workForm, meeting_mode: event.target.value })
+                        updateWorkFormField('meeting_mode', event.target.value)
                       }
                       required
                     >
@@ -2539,6 +2736,9 @@ export default function App() {
                         </option>
                       ))}
                     </select>
+                    {workFormFieldErrors.meeting_mode && (
+                      <span className="work-form__hint">Required</span>
+                    )}
                   </label>
                 </div>
                 {workFormError && <p className="work-form__error">{workFormError}</p>}
@@ -2595,14 +2795,24 @@ export default function App() {
                   >
                     Close
                   </button>
-                  <div className="shop-detail__media">
+                  <div
+                    className="shop-detail__media media-protect"
+                    onContextMenu={preventContextMenu}
+                  >
                     {(activeShopItem.images?.length
                       ? activeShopItem.images
                       : activeShopItem.image
                         ? [activeShopItem.image]
                         : []
                     ).map((src, index) => (
-                      <img src={src} alt={activeShopItem.title} key={`${src}-${index}`} />
+                      <img
+                        src={src}
+                        alt={activeShopItem.title}
+                        key={`${src}-${index}`}
+                        onContextMenu={preventContextMenu}
+                        onDragStart={preventDragStart}
+                        draggable={false}
+                      />
                     ))}
                   </div>
                   <div className="shop-detail__info">

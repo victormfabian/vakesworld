@@ -392,6 +392,15 @@
 
 .service-carousel__viewport {
   padding-bottom: 6px;
+  touch-action: pan-y;
+}
+
+.media-protect {
+  user-select: none;
+}
+
+.media-protect img {
+  user-select: none;
 }
 
 .service-carousel__item img,
@@ -406,11 +415,10 @@
 
 .service-carousel__controls {
   margin-top: 4px;
-  display: grid;
-  grid-template-columns: 18px 1fr 18px;
+  display: flex;
   align-items: center;
-  gap: 2px;
-  justify-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .service-carousel__nav {
@@ -441,6 +449,32 @@
 .service-description {
   font-size: 0.92rem;
   color: rgba(27, 27, 27, 0.75);
+}
+
+.service-description-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.service-cta {
+  border: 1px solid #1f1f1f;
+  background: transparent;
+  color: #1f1f1f;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.service-cta:hover {
+  background: #1f1f1f;
+  color: #fff;
 }
 
 .kit-sections {
@@ -792,6 +826,22 @@
   background: #ffffff;
 }
 
+.work-form__label--error {
+  color: #b22b2b;
+}
+
+.work-form__input--error {
+  border-color: #b22b2b;
+  box-shadow: 0 0 0 1px rgba(178, 43, 43, 0.2);
+}
+
+.work-form__hint {
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #b22b2b;
+}
+
 .work-form__label select:focus-visible {
   outline: 2px solid var(--grey);
   outline-offset: 2px;
@@ -837,6 +887,8 @@
   text-transform: uppercase;
   cursor: pointer;
   width: fit-content;
+  justify-self: end;
+  margin-left: auto;
 }
 
 @media (min-width: 680px) {
