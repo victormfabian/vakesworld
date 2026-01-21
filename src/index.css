@@ -374,24 +374,24 @@
   position: relative;
 }
 
-.service-carousel__track {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
-  padding-bottom: 6px;
-}
-
 .service-carousel__item {
-  flex: 0 0 100%;
-  scroll-snap-align: center;
   border-radius: 12px;
   overflow: hidden;
   background: #f7f7f7;
   aspect-ratio: 16 / 9;
   display: grid;
   place-items: center;
+}
+
+.service-carousel__placeholder {
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.service-carousel__viewport {
+  padding-bottom: 6px;
 }
 
 .service-carousel__item img,
@@ -404,26 +404,38 @@
   border: 0;
 }
 
+.service-carousel__controls {
+  margin-top: 4px;
+  display: grid;
+  grid-template-columns: 18px 1fr 18px;
+  align-items: center;
+  gap: 2px;
+  justify-items: center;
+}
+
 .service-carousel__nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
   border: 0;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 0.65rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  background: transparent;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--ink);
   cursor: pointer;
+  justify-self: center;
 }
 
-.service-carousel__nav--prev {
-  left: 8px;
+.service-carousel__spacer {
+  width: 18px;
+  height: 1px;
 }
 
-.service-carousel__nav--next {
-  right: 8px;
+.service-carousel__count {
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--grey);
+  text-align: center;
+  justify-self: center;
 }
 
 .service-description {
@@ -1045,6 +1057,13 @@
 .admin__input--textarea {
   min-height: 90px;
   resize: vertical;
+}
+
+.admin__media-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .admin__table {
