@@ -68,7 +68,6 @@ export default function App() {
   )
   const todayDate = new Date().toISOString().slice(0, 10)
   const defaultLogoUrl = new URL('./assets/vakes-logo.png', import.meta.url).href
-  const [heroMediaLoaded, setHeroMediaLoaded] = useState(false)
   const [serviceCarouselIndex, setServiceCarouselIndex] = useState({})
   const serviceSwipeState = useRef({})
 
@@ -281,10 +280,6 @@ export default function App() {
       setCheckoutStatus('')
     }
   }, [activePortal])
-
-  useEffect(() => {
-    setHeroMediaLoaded(false)
-  }, [site.logo_url])
 
   useEffect(() => {
     if (activePortal && isWorkWithMePortal(activePortal) && !workForm.date) {
@@ -2118,17 +2113,6 @@ export default function App() {
 
   return (
     <div className="page mx-auto max-w-3xl px-5 pb-10 pt-9 sm:px-6 sm:pb-16 sm:pt-12">
-      {!isAdminView && (!hasLoadedContent || !heroMediaLoaded) && (
-        <div className="page-loading-indicator" aria-label="Loading">
-          <svg
-            className="page-loading-indicator__triangle"
-            viewBox="0 0 48 42"
-            aria-hidden="true"
-          >
-            <path d="M24 2 L46 40 H2 Z" />
-          </svg>
-        </div>
-      )}
       <header className="hero-card">
         <div className="hero-card__inner flex flex-col items-center text-center">
           <p className="hero-card__eyebrow">{site.hero_eyebrow}</p>
@@ -2145,7 +2129,6 @@ export default function App() {
                   title="VAKES World"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
-                  onLoad={() => setHeroMediaLoaded(true)}
                 ></iframe>
               </div>
             ) : isVideoUrl(resolveHeroMediaUrl(site.logo_url)) ? (
@@ -2159,8 +2142,6 @@ export default function App() {
                 controlsList="nodownload noplaybackrate noremoteplayback"
                 disablePictureInPicture
                 disableRemotePlayback
-                onLoadedData={() => setHeroMediaLoaded(true)}
-                onError={() => setHeroMediaLoaded(true)}
                 onContextMenu={preventContextMenu}
                 onCopy={preventCopy}
                 onCut={preventCopy}
@@ -2171,8 +2152,6 @@ export default function App() {
                   src={resolveHeroMediaUrl(site.logo_url)}
                   alt="VAKES World"
                   className="hero-logo h-auto w-[220px] max-w-full"
-                  onLoad={() => setHeroMediaLoaded(true)}
-                  onError={() => setHeroMediaLoaded(true)}
                   onContextMenu={preventContextMenu}
                   onDragStart={preventDragStart}
                   onCopy={preventCopy}

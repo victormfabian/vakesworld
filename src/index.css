@@ -30,44 +30,6 @@
   overflow: hidden;
 }
 
-.page-loading-indicator {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  z-index: 1000;
-  background: rgba(0, 0, 0, 0.3);
-}
-
-.page-loading-indicator__triangle {
-  width: 46px;
-  height: 40px;
-  stroke: var(--accent);
-  stroke-width: 2.5;
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 150;
-  stroke-dashoffset: 150;
-  animation: loader-triangle 1.2s ease-in-out infinite;
-  transform: scaleY(-1);
-}
-
-@keyframes loader-triangle {
-  0% {
-    stroke-dashoffset: -150;
-    opacity: 0.4;
-  }
-  60% {
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
-  100% {
-    stroke-dashoffset: 150;
-    opacity: 0.4;
-  }
-}
-
 .hero-card::after,
 .portal-card::after,
 .admin::after,
