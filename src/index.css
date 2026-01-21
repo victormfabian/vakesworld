@@ -12,11 +12,18 @@
     --shimmer-duration: 4s;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply text-charcoal font-sans;
     background-color: var(--paper);
     background-image: none;
     line-height: 1.55;
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
