@@ -68,6 +68,7 @@ export default function App() {
   const todayDate = new Date().toISOString().slice(0, 10)
   const defaultLogoUrl = new URL('./assets/vakes-logo.png', import.meta.url).href
   const [heroMediaLoaded, setHeroMediaLoaded] = useState(false)
+  const [serviceCarouselIndex, setServiceCarouselIndex] = useState({})
 
   const isSuccessKitPortal = (portal) => {
     const meta = portal?.meta?.toLowerCase() || ''
@@ -420,6 +421,28 @@ export default function App() {
       maximumFractionDigits: 2,
     }).format(amount)
 
+
+  const normalizeServiceMedia = (service) => {
+    const media = Array.isArray(service.media)
+      ? service.media
+      : typeof service.media === 'string' && service.media
+        ? [service.media]
+        : []
+    const items = [service.image, ...media]
+      .filter(Boolean)
+      .map((item) => {
+        if (typeof item === 'string') {
+          return item.trim()
+        }
+        if (typeof item === 'object') {
+          return (item.url || item.src || '').trim()
+        }
+        return ''
+      })
+      .filter(Boolean)
+    return [...new Set(items)]
+  }
+
   const getItemAmount = (item, currency, rates) => {
     const baseValue =
       typeof item.price_ngn === 'number'
@@ -627,6 +650,45 @@ export default function App() {
     setDraftPortals(nextPortals)
   }
 
+  const handleServiceMediaChange = (portalIndex, serviceIndex, mediaIndex, value) => {
+    const nextPortals = [...draftPortals]
+    const portal = nextPortals[portalIndex]
+    const services =
+      portal.services?.length ? [...portal.services] : [...DEFAULT_PORTALS[0].services]
+    const service = services[serviceIndex]
+    const media = Array.isArray(service.media) ? [...service.media] : []
+    media[mediaIndex] = value
+    services[serviceIndex] = { ...service, media }
+    nextPortals[portalIndex] = { ...portal, services }
+    setDraftPortals(nextPortals)
+  }
+
+  const handleAddServiceMedia = (portalIndex, serviceIndex) => {
+    const nextPortals = [...draftPortals]
+    const portal = nextPortals[portalIndex]
+    const services =
+      portal.services?.length ? [...portal.services] : [...DEFAULT_PORTALS[0].services]
+    const service = services[serviceIndex]
+    const media = Array.isArray(service.media) ? [...service.media] : []
+    media.push('')
+    services[serviceIndex] = { ...service, media }
+    nextPortals[portalIndex] = { ...portal, services }
+    setDraftPortals(nextPortals)
+  }
+
+  const handleRemoveServiceMedia = (portalIndex, serviceIndex, mediaIndex) => {
+    const nextPortals = [...draftPortals]
+    const portal = nextPortals[portalIndex]
+    const services =
+      portal.services?.length ? [...portal.services] : [...DEFAULT_PORTALS[0].services]
+    const service = services[serviceIndex]
+    const media = Array.isArray(service.media) ? [...service.media] : []
+    media.splice(mediaIndex, 1)
+    services[serviceIndex] = { ...service, media }
+    nextPortals[portalIndex] = { ...portal, services }
+    setDraftPortals(nextPortals)
+  }
+
   const handleServiceCarouselScroll = (event, direction) => {
     const track = event.currentTarget
       .closest('.service-carousel')
@@ -636,6 +698,14 @@ export default function App() {
     }
     const width = track.clientWidth
     track.scrollBy({ left: width * direction, behavior: 'smooth' })
+  }
+
+  const handleServiceCarouselStep = (key, total, direction) => {
+    setServiceCarouselIndex((prevState) => {
+      const current = prevState[key] ?? 0
+      const next = (current + direction + total) % total
+      return { ...prevState, [key]: next }
+    })
   }
 
   const handleSuccessKitChange = (
@@ -1260,23 +1330,51 @@ export default function App() {
                                     />
                                   </label>
                                   <label className="admin__label">
-                                    Media URLs (comma separated)
-                                    <input
-                                      className="admin__input"
-                                      value={(service.media || []).join(', ')}
-                                      onChange={(event) =>
-                                        handleServiceChange(
-                                          index,
-                                          serviceIndex,
-                                          'media',
-                                          event.target.value
-                                            .split(',')
-                                            .map((value) => value.trim())
-                                            .filter(Boolean)
-                                        )
-                                      }
-                                    />
+                                    Media URLs
                                   </label>
+                                  <div className="admin__list">
+                                    {(service.media || []).map((item, mediaIndex) => (
+                                      <div
+                                        className="admin__media-row"
+                                        key={`${portal.id}-service-${serviceIndex}-${mediaIndex}`}
+                                      >
+                                        <input
+                                          className="admin__input"
+                                          value={item}
+                                          onChange={(event) =>
+                                            handleServiceMediaChange(
+                                              index,
+                                              serviceIndex,
+                                              mediaIndex,
+                                              event.target.value
+                                            )
+                                          }
+                                        />
+                                        <button
+                                          type="button"
+                                          className="admin__button admin__button--ghost"
+                                          onClick={() =>
+                                            handleRemoveServiceMedia(
+                                              index,
+                                              serviceIndex,
+                                              mediaIndex
+                                            )
+                                          }
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    ))}
+                                    <button
+                                      type="button"
+                                      className="admin__button admin__button--ghost"
+                                      onClick={() =>
+                                        handleAddServiceMedia(index, serviceIndex)
+                                      }
+                                    >
+                                      Add media
+                                    </button>
+                                  </div>
                                   <label className="admin__label">
                                     Description
                                     <textarea
@@ -2072,70 +2170,86 @@ export default function App() {
                     </summary>
                     <div className="service-body">
                       {(() => {
-                        const mediaItems = service.media?.length
-                          ? service.media
-                          : service.image
-                            ? [service.image]
-                            : []
+                        const mediaItems = normalizeServiceMedia(service)
                         if (!mediaItems.length) {
                           return null
                         }
+                        const key = `${service.title}-${index}`
+                        const currentIndex = serviceCarouselIndex[key] ?? 0
+                        const currentItem = mediaItems[currentIndex]
+                        const youtubeUrl = getYouTubeEmbedUrl(currentItem)
                         return (
                           <div className="service-carousel">
-                            {mediaItems.length > 1 && (
-                              <>
-                                <button
-                                  type="button"
-                                  className="service-carousel__nav service-carousel__nav--prev"
-                                  onClick={(event) =>
-                                    handleServiceCarouselScroll(event, -1)
-                                  }
-                                  aria-label="Previous media"
-                                >
-                                  Prev
-                                </button>
-                                <button
-                                  type="button"
-                                  className="service-carousel__nav service-carousel__nav--next"
-                                  onClick={(event) =>
-                                    handleServiceCarouselScroll(event, 1)
-                                  }
-                                  aria-label="Next media"
-                                >
-                                  Next
-                                </button>
-                              </>
-                            )}
-                            <div className="service-carousel__track">
-                              {mediaItems.map((item, mediaIndex) => {
-                                const youtubeUrl = getYouTubeEmbedUrl(item)
-                                return (
-                                  <div
-                                    className="service-carousel__item"
-                                    key={`${item}-${mediaIndex}`}
-                                  >
-                                    {youtubeUrl ? (
-                                      <iframe
-                                        src={youtubeUrl}
-                                        title={service.title}
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                        allowFullScreen
-                                      ></iframe>
-                                    ) : isVideoUrl(item) ? (
-                                      <video
-                                        src={item}
-                                        autoPlay
-                                        loop
-                                        muted
-                                        playsInline
-                                      />
-                                    ) : (
-                                      <img src={item} alt={service.title} />
-                                    )}
+                            <div className="service-carousel__viewport">
+                              <div className="service-carousel__item">
+                                {!currentItem ? (
+                                  <div className="service-carousel__placeholder">
+                                    Media unavailable
                                   </div>
-                                )
-                              })}
+                                ) : youtubeUrl ? (
+                                  <iframe
+                                    src={youtubeUrl}
+                                    title={service.title}
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                  ></iframe>
+                                ) : isVideoUrl(currentItem) ? (
+                                  <video
+                                    src={currentItem}
+                                    autoPlay
+                                    loop
+                                    muted
+                                    playsInline
+                                    controls
+                                  />
+                                ) : (
+                                  <img src={currentItem} alt={service.title} />
+                                )}
+                              </div>
                             </div>
+                            {mediaItems.length > 1 && (
+                              <div className="service-carousel__controls">
+                                {currentIndex > 0 ? (
+                                  <button
+                                    type="button"
+                                    className="service-carousel__nav"
+                                    onClick={() =>
+                                      handleServiceCarouselStep(
+                                        key,
+                                        mediaItems.length,
+                                        -1
+                                      )
+                                    }
+                                    aria-label="Previous media"
+                                  >
+                                    &larr;
+                                  </button>
+                                ) : (
+                                  <span className="service-carousel__spacer"></span>
+                                )}
+                                <div className="service-carousel__count">
+                                  {currentIndex + 1} / {mediaItems.length}
+                                </div>
+                                {currentIndex < mediaItems.length - 1 ? (
+                                  <button
+                                    type="button"
+                                    className="service-carousel__nav"
+                                    onClick={() =>
+                                      handleServiceCarouselStep(
+                                        key,
+                                        mediaItems.length,
+                                        1
+                                      )
+                                    }
+                                    aria-label="Next media"
+                                  >
+                                    &rarr;
+                                  </button>
+                                ) : (
+                                  <span className="service-carousel__spacer"></span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )
                       })()}
@@ -2615,3 +2729,4 @@ export default function App() {
     </div>
   )
 }
+
