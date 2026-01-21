@@ -319,6 +319,22 @@ export default function App() {
     return () => clearInterval(timer)
   }, [activePortal])
 
+  useEffect(() => {
+    if (isAdminView) {
+      return
+    }
+
+    const handleKeyDown = (event) => {
+      const key = event.key?.toLowerCase()
+      if ((event.ctrlKey || event.metaKey) && (key === 's' || key === 'p')) {
+        event.preventDefault()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isAdminView])
+
   const isAdminUser = useMemo(
     () => session?.user?.email?.toLowerCase() === ADMIN_EMAIL,
     [session]
@@ -751,6 +767,10 @@ export default function App() {
   }
 
   const preventDragStart = (event) => {
+    event.preventDefault()
+  }
+
+  const preventCopy = (event) => {
     event.preventDefault()
   }
 
@@ -2114,7 +2134,12 @@ export default function App() {
           <p className="hero-card__eyebrow">{site.hero_eyebrow}</p>
           <div className="mt-4">
             {getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url)) ? (
-              <div className="hero-video media-protect" onContextMenu={preventContextMenu}>
+              <div
+                className="hero-video media-protect"
+                onContextMenu={preventContextMenu}
+                onCopy={preventCopy}
+                onCut={preventCopy}
+              >
                 <iframe
                   src={getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url))}
                   title="VAKES World"
@@ -2137,18 +2162,24 @@ export default function App() {
                 onLoadedData={() => setHeroMediaLoaded(true)}
                 onError={() => setHeroMediaLoaded(true)}
                 onContextMenu={preventContextMenu}
+                onCopy={preventCopy}
+                onCut={preventCopy}
               />
             ) : (
-              <img
-                src={resolveHeroMediaUrl(site.logo_url)}
-                alt="VAKES World"
-                className="hero-logo h-auto w-[220px] max-w-full"
-                onLoad={() => setHeroMediaLoaded(true)}
-                onError={() => setHeroMediaLoaded(true)}
-                onContextMenu={preventContextMenu}
-                onDragStart={preventDragStart}
-                draggable={false}
-              />
+              <div className="media-protect media-protect--overlay">
+                <img
+                  src={resolveHeroMediaUrl(site.logo_url)}
+                  alt="VAKES World"
+                  className="hero-logo h-auto w-[220px] max-w-full"
+                  onLoad={() => setHeroMediaLoaded(true)}
+                  onError={() => setHeroMediaLoaded(true)}
+                  onContextMenu={preventContextMenu}
+                  onDragStart={preventDragStart}
+                  onCopy={preventCopy}
+                  onCut={preventCopy}
+                  draggable={false}
+                />
+              </div>
             )}
           </div>
           <p className="hero-card__tagline">{site.hero_tagline}</p>
@@ -2268,7 +2299,7 @@ export default function App() {
                         const youtubeUrl = getYouTubeEmbedUrl(currentItem)
                         return (
                           <div className="service-carousel">
-                          <div
+                            <div
                               className="service-carousel__viewport media-protect"
                               onPointerDown={(event) =>
                                 handleServiceCarouselPointerDown(key, event)
@@ -2284,6 +2315,8 @@ export default function App() {
                                 handleServiceCarouselPointerCancel(key, event)
                               }
                               onContextMenu={preventContextMenu}
+                              onCopy={preventCopy}
+                              onCut={preventCopy}
                             >
                               <div className="service-carousel__item">
                                 {!currentItem ? (
@@ -2309,6 +2342,8 @@ export default function App() {
                                     disablePictureInPicture
                                     disableRemotePlayback
                                     onContextMenu={preventContextMenu}
+                                    onCopy={preventCopy}
+                                    onCut={preventCopy}
                                   />
                                 ) : (
                                   <img
@@ -2316,6 +2351,8 @@ export default function App() {
                                     alt={service.title}
                                     onContextMenu={preventContextMenu}
                                     onDragStart={preventDragStart}
+                                    onCopy={preventCopy}
+                                    onCut={preventCopy}
                                     draggable={false}
                                   />
                                 )}
@@ -2470,8 +2507,10 @@ export default function App() {
                       .map((item, itemIndex) => (
                         <div className="shop-card" key={`${item.title}-${itemIndex}`}>
                           <div
-                            className="shop-card__media media-protect"
+                            className="shop-card__media media-protect media-protect--overlay"
                             onContextMenu={preventContextMenu}
+                            onCopy={preventCopy}
+                            onCut={preventCopy}
                           >
                             {item.image ? (
                               <img
@@ -2479,6 +2518,8 @@ export default function App() {
                                 alt={item.title}
                                 onContextMenu={preventContextMenu}
                                 onDragStart={preventDragStart}
+                                onCopy={preventCopy}
+                                onCut={preventCopy}
                                 draggable={false}
                               />
                             ) : (
@@ -2796,8 +2837,10 @@ export default function App() {
                     Close
                   </button>
                   <div
-                    className="shop-detail__media media-protect"
+                    className="shop-detail__media media-protect media-protect--overlay"
                     onContextMenu={preventContextMenu}
+                    onCopy={preventCopy}
+                    onCut={preventCopy}
                   >
                     {(activeShopItem.images?.length
                       ? activeShopItem.images
@@ -2811,6 +2854,8 @@ export default function App() {
                         key={`${src}-${index}`}
                         onContextMenu={preventContextMenu}
                         onDragStart={preventDragStart}
+                        onCopy={preventCopy}
+                        onCut={preventCopy}
                         draggable={false}
                       />
                     ))}

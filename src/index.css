@@ -397,10 +397,24 @@
 
 .media-protect {
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .media-protect img {
   user-select: none;
+  -webkit-user-drag: none;
+}
+
+.media-protect--overlay {
+  position: relative;
+}
+
+.media-protect--overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: transparent;
 }
 
 .service-carousel__item img,
