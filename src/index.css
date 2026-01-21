@@ -77,12 +77,12 @@
   width: 22px;
   height: 18px;
   fill: var(--accent);
-  transform: rotate(-90deg);
+  transform: rotate(90deg);
   transition: transform 0.2s ease;
 }
 
 .about-dock__button.is-open .about-dock__icon {
-  transform: rotate(90deg);
+  transform: rotate(-90deg);
 }
 
 .about-dock__label-button {
