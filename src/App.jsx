@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  DEFAULT_ABOUT,
   DEFAULT_PORTALS,
   DEFAULT_SITE,
   DEFAULT_SUCCESS_KIT,
@@ -11,14 +12,49 @@ import { isSupabaseConfigured, supabase } from './supabaseClient'
 const ADMIN_HASH = '#/admin'
 const ADMIN_EMAIL = 'victorvakes@gmail.com'
 
+const loadCachedJSON = (key) => {
+  if (typeof window === 'undefined') {
+    return null
+  }
+  try {
+    const raw = window.localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : null
+  } catch (error) {
+    return null
+  }
+}
+
 export default function App() {
+  const cachedSite = loadCachedJSON('vakes_site')
+  const cachedPortals = loadCachedJSON('vakes_portals')
   const [isAdminView, setIsAdminView] = useState(
     window.location.hash === ADMIN_HASH
   )
-  const [site, setSite] = useState(DEFAULT_SITE)
-  const [portals, setPortals] = useState(DEFAULT_PORTALS)
-  const [draftSite, setDraftSite] = useState(DEFAULT_SITE)
-  const [draftPortals, setDraftPortals] = useState(DEFAULT_PORTALS)
+  const [site, setSite] = useState(
+    cachedSite
+      ? { ...DEFAULT_SITE, ...cachedSite }
+      : {
+          ...DEFAULT_SITE,
+          hero_eyebrow: '',
+          hero_tagline: '',
+          hero_subline: '',
+          logo_url: '',
+          instagram_url: '',
+          tiktok_url: '',
+          youtube_url: '',
+          footer_text: '',
+          about_section: DEFAULT_ABOUT,
+        }
+  )
+  const [portals, setPortals] = useState(
+    cachedPortals?.length ? cachedPortals : []
+  )
+  const [draftSite, setDraftSite] = useState(
+    cachedSite ? { ...DEFAULT_SITE, ...cachedSite } : DEFAULT_SITE
+  )
+  const [draftPortals, setDraftPortals] = useState(
+    cachedPortals?.length ? cachedPortals : DEFAULT_PORTALS
+  )
   const [deletedPortalIds, setDeletedPortalIds] = useState([])
   const [session, setSession] = useState(null)
   const [authEmail, setAuthEmail] = useState('')
@@ -33,6 +69,8 @@ export default function App() {
   const [activeShopItem, setActiveShopItem] = useState(null)
   const [activeShopSize, setActiveShopSize] = useState('')
   const [activeCurrency, setActiveCurrency] = useState('NGN')
+  const [aboutExpanded, setAboutExpanded] = useState(false)
+  const [aboutModalOpen, setAboutModalOpen] = useState(false)
   const [checkoutForm, setCheckoutForm] = useState({
     fullName: '',
     address: '',
@@ -129,6 +167,17 @@ export default function App() {
       setDraftSite(DEFAULT_SITE)
       setDraftPortals(DEFAULT_PORTALS)
       setHasLoadedContent(true)
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem('vakes_site', JSON.stringify(DEFAULT_SITE))
+          window.localStorage.setItem(
+            'vakes_portals',
+            JSON.stringify(DEFAULT_PORTALS)
+          )
+        } catch (error) {
+          // Ignore storage failures.
+        }
+      }
       return
     }
 
@@ -196,6 +245,15 @@ export default function App() {
       setDeletedPortalIds([])
       setHasLoadedContent(true)
       setLoading(false)
+
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem('vakes_site', JSON.stringify(mergedSite))
+          window.localStorage.setItem('vakes_portals', JSON.stringify(mergedPortals))
+        } catch (error) {
+          // Ignore storage failures (private mode, quota).
+        }
+      }
     }
 
     loadContent()
@@ -434,6 +492,11 @@ export default function App() {
       maximumFractionDigits: 2,
     }).format(amount)
 
+  const getAboutSection = (siteData) =>
+    siteData.about_section
+      ? { ...DEFAULT_ABOUT, ...siteData.about_section }
+      : DEFAULT_ABOUT
+
 
   const normalizeServiceMedia = (service) => {
     const media = Array.isArray(service.media)
@@ -547,6 +610,7 @@ export default function App() {
       tiktok_url: draftSite.tiktok_url,
       youtube_url: draftSite.youtube_url,
       footer_text: draftSite.footer_text,
+      about_section: draftSite.about_section || DEFAULT_ABOUT,
     }
 
     const { error: siteError } = await supabase
@@ -1310,6 +1374,136 @@ export default function App() {
                       }
                   />
                 </label>
+              </div>
+              <div className="admin__section">
+                <h2 className="admin__subtitle">About VAKES</h2>
+                <div className="admin__grid">
+                  <label className="admin__label">
+                    Image URL
+                    <input
+                      className="admin__input"
+                      value={getAboutSection(draftSite).image_url || ''}
+                      onChange={(event) =>
+                        setDraftSite({
+                          ...draftSite,
+                          about_section: {
+                            ...getAboutSection(draftSite),
+                            image_url: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="admin__label admin__label--full">
+                    Bio
+                    <textarea
+                      className="admin__input admin__input--textarea"
+                      value={getAboutSection(draftSite).bio || ''}
+                      onChange={(event) =>
+                        setDraftSite({
+                          ...draftSite,
+                          about_section: {
+                            ...getAboutSection(draftSite),
+                            bio: event.target.value,
+                          },
+                        })
+                      }
+                      rows={4}
+                    />
+                  </label>
+                  <label className="admin__label">
+                    Email
+                    <input
+                      className="admin__input"
+                      value={getAboutSection(draftSite).email || ''}
+                      onChange={(event) =>
+                        setDraftSite({
+                          ...draftSite,
+                          about_section: {
+                            ...getAboutSection(draftSite),
+                            email: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="admin__label">
+                    Phone
+                    <input
+                      className="admin__input"
+                      value={getAboutSection(draftSite).phone || ''}
+                      onChange={(event) =>
+                        setDraftSite({
+                          ...draftSite,
+                          about_section: {
+                            ...getAboutSection(draftSite),
+                            phone: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="admin__label admin__label--full">
+                    Team (one per line)
+                    <textarea
+                      className="admin__input admin__input--textarea"
+                      value={(getAboutSection(draftSite).team || []).join('\n')}
+                      onChange={(event) =>
+                        setDraftSite({
+                          ...draftSite,
+                          about_section: {
+                            ...getAboutSection(draftSite),
+                            team: event.target.value
+                              .split('\n')
+                              .map((item) => item.trim())
+                              .filter(Boolean),
+                          },
+                        })
+                      }
+                      rows={3}
+                    />
+                  </label>
+                  <label className="admin__label admin__label--full">
+                    Partners (one per line)
+                    <textarea
+                      className="admin__input admin__input--textarea"
+                      value={(getAboutSection(draftSite).partners || []).join('\n')}
+                      onChange={(event) =>
+                        setDraftSite({
+                          ...draftSite,
+                          about_section: {
+                            ...getAboutSection(draftSite),
+                            partners: event.target.value
+                              .split('\n')
+                              .map((item) => item.trim())
+                              .filter(Boolean),
+                          },
+                        })
+                      }
+                      rows={3}
+                    />
+                  </label>
+                  <label className="admin__label admin__label--full">
+                    Blog links (one per line)
+                    <textarea
+                      className="admin__input admin__input--textarea"
+                      value={(getAboutSection(draftSite).blog_links || []).join('\n')}
+                      onChange={(event) =>
+                        setDraftSite({
+                          ...draftSite,
+                          about_section: {
+                            ...getAboutSection(draftSite),
+                            blog_links: event.target.value
+                              .split('\n')
+                              .map((item) => item.trim())
+                              .filter(Boolean),
+                          },
+                        })
+                      }
+                      rows={3}
+                    />
+                  </label>
+                </div>
               </div>
               </div>
               )}
@@ -2211,8 +2405,32 @@ export default function App() {
         <div className="hero__confetti" aria-hidden="true"></div>
       </header>
 
+      <div className="about-dock">
+        <div className={`about-dock__button${aboutExpanded ? ' is-open' : ''}`}>
+          <button
+            type="button"
+            className="about-dock__toggle"
+            onClick={() => setAboutExpanded((prev) => !prev)}
+            aria-label={aboutExpanded ? 'Close About VAKES' : 'Open About VAKES'}
+          >
+            <span className="about-dock__icon-wrap" aria-hidden="true">
+              <svg className="about-dock__icon" viewBox="0 0 36 32">
+                <path d="M18 30 L34 2 H2 Z" />
+              </svg>
+            </span>
+          </button>
+          <button
+            type="button"
+            className="about-dock__label-button"
+            onClick={() => setAboutModalOpen(true)}
+          >
+            About VAKES
+          </button>
+        </div>
+      </div>
+
       <nav className="portal-grid mt-6 sm:mt-8" aria-label="Primary">
-        {(hasLoadedContent ? portals : []).map((portal, index) => (
+        {portals.map((portal, index) => (
           <a
             key={portal.id ?? portal.meta}
             data-animate
@@ -2226,6 +2444,104 @@ export default function App() {
           </a>
         ))}
       </nav>
+
+      {aboutModalOpen && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => setAboutModalOpen(false)}
+        >
+          <div
+            className="modal about-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="About VAKES"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="modal__close"
+              onClick={() => setAboutModalOpen(false)}
+              aria-label="Close modal"
+            >
+              Close
+            </button>
+            <p className="modal__meta">About</p>
+            <h2 className="modal__title">VAKES World</h2>
+            <div className="about-modal__content">
+              {getAboutSection(site).image_url ? (
+                <div className="about-modal__media media-protect media-protect--overlay">
+                  <img
+                    src={getAboutSection(site).image_url}
+                    alt="About VAKES"
+                    onContextMenu={preventContextMenu}
+                    onDragStart={preventDragStart}
+                    onCopy={preventCopy}
+                    onCut={preventCopy}
+                    draggable={false}
+                  />
+                </div>
+              ) : null}
+              <div className="about-modal__details">
+                {getAboutSection(site).bio && (
+                  <p className="about-modal__bio">
+                    {getAboutSection(site).bio}
+                  </p>
+                )}
+                <div className="about-modal__grid">
+                  <div>
+                    <h3>Team</h3>
+                    <ul>
+                      {(getAboutSection(site).team || []).map((member) => (
+                        <li key={member}>{member}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3>Partners</h3>
+                    <ul>
+                      {(getAboutSection(site).partners || []).map((partner) => (
+                        <li key={partner}>{partner}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3>Blog</h3>
+                    <ul>
+                      {(getAboutSection(site).blog_links || []).map((link) => (
+                        <li key={link}>
+                          <a href={link} target="_blank" rel="noreferrer">
+                            {link}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3>Contact</h3>
+                    <ul>
+                      {getAboutSection(site).email && (
+                        <li>
+                          <a href={`mailto:${getAboutSection(site).email}`}>
+                            {getAboutSection(site).email}
+                          </a>
+                        </li>
+                      )}
+                      {getAboutSection(site).phone && (
+                        <li>
+                          <a href={`tel:${getAboutSection(site).phone}`}>
+                            {getAboutSection(site).phone}
+                          </a>
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {activePortal && (
         <div
@@ -2352,7 +2668,7 @@ export default function App() {
                                     }
                                     aria-label="Previous media"
                                   >
-                                    &larr;
+                                    &lt;
                                   </button>
                                 ) : (
                                   <span className="service-carousel__spacer"></span>
@@ -2373,7 +2689,7 @@ export default function App() {
                                     }
                                     aria-label="Next media"
                                   >
-                                    &rarr;
+                                    &gt;
                                   </button>
                                 ) : (
                                   <span className="service-carousel__spacer"></span>

@@ -1,3 +1,13 @@
+export const DEFAULT_ABOUT = {
+  image_url: '',
+  bio: 'VAKES World is a creative studio blending art, technology, and culture.',
+  team: ['Creative Director', 'Design Lead', 'Engineering'],
+  partners: ['Collaborators', 'Studios', 'Brands'],
+  blog_links: [],
+  email: 'hello@vakes.world',
+  phone: '+234 000 000 0000',
+}
+
 export const DEFAULT_SITE = {
   id: 1,
   hero_eyebrow: 'Curated Creative Universe',
@@ -7,7 +17,8 @@ export const DEFAULT_SITE = {
   instagram_url: 'https://www.instagram.com/vakesworld',
   tiktok_url: 'https://www.tiktok.com/@vakesworld',
   youtube_url: 'https://www.youtube.com/@vakesworld',
-  footer_text: 'Ac VAKES World',
+  footer_text: '(c) VAKES World',
+  about_section: DEFAULT_ABOUT,
 }
 
 export const DEFAULT_SUCCESS_KIT = {
