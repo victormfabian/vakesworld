@@ -37,6 +37,50 @@
   overflow: hidden;
 }
 
+.portal-page {
+  margin-top: 28px;
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 28px;
+}
+
+.portal-page__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.portal-page__meta {
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.portal-page__title {
+  font-size: 2rem;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.portal-page__back {
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--grey);
+  text-decoration: none;
+}
+
+.portal-page__back:hover {
+  color: #1f1f1f;
+}
+
+.portal-page__body {
+  margin-top: 18px;
+}
+
 .about-dock {
   position: fixed;
   right: 0;

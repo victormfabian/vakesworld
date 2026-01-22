@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   DEFAULT_ABOUT,
   DEFAULT_PORTALS,
@@ -71,6 +72,8 @@ export default function App() {
   const [activeCurrency, setActiveCurrency] = useState('NGN')
   const [aboutExpanded, setAboutExpanded] = useState(false)
   const [aboutModalOpen, setAboutModalOpen] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
   const [checkoutForm, setCheckoutForm] = useState({
     fullName: '',
     address: '',
@@ -132,6 +135,14 @@ export default function App() {
     return meta.includes('work with') || title.includes('start a project')
   }
 
+  const slugify = (value) =>
+    (value || '')
+      .toString()
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '')
+
   const isVideoUrl = (url) => /\.(mp4)(\?.*)?$/i.test(url || '')
   const getYouTubeEmbedUrl = (url) => {
     if (!url) {
@@ -149,6 +160,33 @@ export default function App() {
     }
     return url
   }
+
+  const portalRoutes = useMemo(
+    () =>
+      portals.map((portal, index) => {
+        let slug = slugify(portal?.meta || portal?.title)
+        if (isServicesPortal(portal, index)) {
+          slug = 'services'
+        } else if (isShopPortal(portal)) {
+          slug = 'shop'
+        } else if (isWorkWithMePortal(portal)) {
+          slug = 'work-with-vakes'
+        } else if (slug.includes('product')) {
+          slug = 'products'
+        } else if (slug.includes('success')) {
+          slug = 'success-kit'
+        } else if (!slug) {
+          slug = `portal-${index + 1}`
+        }
+        return { portal, index, slug, path: `/${slug}` }
+      }),
+    [portals]
+  )
+
+  const routeSlug = location.pathname.replace(/^\/+|\/+$/g, '')
+  const routePortal = portalRoutes.find((item) => item.slug === routeSlug) || null
+  const activeContentPortal = routePortal?.portal || activePortal
+  const activeContentIndex = routePortal?.index ?? activePortalIndex
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -323,11 +361,11 @@ export default function App() {
   }, [activePortal])
 
   useEffect(() => {
-    if (activePortal && isShopPortal(activePortal)) {
+    if (activeContentPortal && isShopPortal(activeContentPortal)) {
       setActiveShopTab('all')
       setActiveShopItem(null)
       setActiveShopSize('')
-      setActiveCurrency(getShop(activePortal).currency || 'NGN')
+      setActiveCurrency(getShop(activeContentPortal).currency || 'NGN')
       setCheckoutForm({
         fullName: '',
         address: '',
@@ -337,13 +375,17 @@ export default function App() {
       setCheckoutError('')
       setCheckoutStatus('')
     }
-  }, [activePortal])
+  }, [activeContentPortal])
 
   useEffect(() => {
-    if (activePortal && isWorkWithMePortal(activePortal) && !workForm.date) {
+    if (
+      activeContentPortal &&
+      isWorkWithMePortal(activeContentPortal) &&
+      !workForm.date
+    ) {
       setWorkForm((prevForm) => ({ ...prevForm, date: todayDate }))
     }
-  }, [activePortal, todayDate, workForm.date])
+  }, [activeContentPortal, todayDate, workForm.date])
 
   useEffect(() => {
     if (!workForm.date || !workForm.time) {
@@ -356,7 +398,7 @@ export default function App() {
   }, [workForm.date, workForm.time, todayDate, currentTime])
 
   useEffect(() => {
-    if (!activePortal || !isWorkWithMePortal(activePortal)) {
+    if (!activeContentPortal || !isWorkWithMePortal(activeContentPortal)) {
       return
     }
 
@@ -370,7 +412,7 @@ export default function App() {
     }, 60000)
 
     return () => clearInterval(timer)
-  }, [activePortal])
+  }, [activeContentPortal])
 
   useEffect(() => {
     if (isAdminView) {
@@ -834,12 +876,11 @@ export default function App() {
   }
 
   const handleStartProjectClick = () => {
-    const portalIndex = portals.findIndex((portal) => isWorkWithMePortal(portal))
-    if (portalIndex === -1) {
+    const target = portalRoutes.find((item) => isWorkWithMePortal(item.portal))
+    if (!target) {
       return
     }
-    setActivePortal(portals[portalIndex])
-    setActivePortalIndex(portalIndex)
+    navigate(target.path)
   }
 
   const handleSuccessKitChange = (
@@ -1030,7 +1071,7 @@ export default function App() {
     setCheckoutError('')
     setCheckoutStatus('Saving order...')
 
-    const shop = getShop(activePortal || {})
+    const shop = getShop(activeContentPortal || {})
     const amount = getItemAmount(activeShopItem, activeCurrency, shop.currency_rates)
 
     if (amount <= 0) {
@@ -1128,6 +1169,520 @@ export default function App() {
 
     setWorkFormStatus('Request submitted. We will reach out soon.')
   }
+
+  const renderPortalContent = (portal, portalIndex) => (
+    <>
+      {isServicesPortal(portal, portalIndex) && (
+        <div className="service-list">
+          {(portal.services?.length ? portal.services : DEFAULT_PORTALS[0].services).map(
+            (service, index) => (
+              <details className="service-item" key={`${service.title}-${index}`}>
+                <summary className="service-summary">
+                  <span>{service.title}</span>
+                </summary>
+                <div className="service-body">
+                  {(() => {
+                    const mediaItems = normalizeServiceMedia(service)
+                    if (!mediaItems.length) {
+                      return null
+                    }
+                    const key = `${service.title}-${index}`
+                    const currentIndex = serviceCarouselIndex[key] ?? 0
+                    const currentItem = mediaItems[currentIndex]
+                    const youtubeUrl = getYouTubeEmbedUrl(currentItem)
+                    return (
+                      <div className="service-carousel">
+                        <div
+                          className="service-carousel__viewport media-protect"
+                          onPointerDown={(event) =>
+                            handleServiceCarouselPointerDown(key, event)
+                          }
+                          onPointerUp={(event) =>
+                            handleServiceCarouselPointerUp(
+                              key,
+                              mediaItems.length,
+                              event
+                            )
+                          }
+                          onPointerCancel={(event) =>
+                            handleServiceCarouselPointerCancel(key, event)
+                          }
+                          onContextMenu={preventContextMenu}
+                          onCopy={preventCopy}
+                          onCut={preventCopy}
+                        >
+                          <div className="service-carousel__item">
+                            {!currentItem ? (
+                              <div className="service-carousel__placeholder">
+                                Media unavailable
+                              </div>
+                            ) : youtubeUrl ? (
+                              <iframe
+                                src={youtubeUrl}
+                                title={service.title}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                              ></iframe>
+                            ) : isVideoUrl(currentItem) ? (
+                              <video
+                                src={currentItem}
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                controls
+                                controlsList="nodownload noplaybackrate noremoteplayback"
+                                disablePictureInPicture
+                                disableRemotePlayback
+                                onContextMenu={preventContextMenu}
+                                onCopy={preventCopy}
+                                onCut={preventCopy}
+                              />
+                            ) : (
+                              <img
+                                src={currentItem}
+                                alt={service.title}
+                                onContextMenu={preventContextMenu}
+                                onDragStart={preventDragStart}
+                                onCopy={preventCopy}
+                                onCut={preventCopy}
+                                draggable={false}
+                              />
+                            )}
+                          </div>
+                        </div>
+                        {mediaItems.length > 1 && (
+                          <div className="service-carousel__controls">
+                            {currentIndex > 0 ? (
+                              <button
+                                type="button"
+                                className="service-carousel__nav"
+                                onClick={() =>
+                                  handleServiceCarouselStep(
+                                    key,
+                                    mediaItems.length,
+                                    -1
+                                  )
+                                }
+                                aria-label="Previous media"
+                              >
+                                &lt;
+                              </button>
+                            ) : (
+                              <span className="service-carousel__spacer"></span>
+                            )}
+                            <div className="service-carousel__count">
+                              {currentIndex + 1} / {mediaItems.length}
+                            </div>
+                            {currentIndex < mediaItems.length - 1 ? (
+                              <button
+                                type="button"
+                                className="service-carousel__nav"
+                                onClick={() =>
+                                  handleServiceCarouselStep(
+                                    key,
+                                    mediaItems.length,
+                                    1
+                                  )
+                                }
+                                aria-label="Next media"
+                              >
+                                &gt;
+                              </button>
+                            ) : (
+                              <span className="service-carousel__spacer"></span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+                  {(service.description || portals.some(isWorkWithMePortal)) && (
+                    <div className="service-description-row">
+                      {service.description && (
+                        <p className="service-description">{service.description}</p>
+                      )}
+                      {portals.some(isWorkWithMePortal) && (
+                        <button
+                          type="button"
+                          className="service-cta"
+                          onClick={handleStartProjectClick}
+                        >
+                          Start a project
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </details>
+            )
+          )}
+        </div>
+      )}
+      {isSuccessKitPortal(portal) && (
+        <div className="kit-sections">
+          {SUCCESS_KIT_SECTIONS.map((section) => {
+            const items = getSuccessKit(portal)[section.key] || []
+            return (
+              <div className="kit-section" key={section.key}>
+                <h3 className="kit-title">{section.label}</h3>
+                <ul className="kit-list">
+                  {items.map((item, itemIndex) => (
+                    <li className="kit-item" key={`${section.key}-${itemIndex}`}>
+                      {item.link ? (
+                        <a
+                          className="kit-item__title kit-item__link"
+                          href={item.link}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {item.title}
+                        </a>
+                      ) : (
+                        <div className="kit-item__title">{item.title}</div>
+                      )}
+                      {item.tags && (
+                        <div className="kit-item__tags">
+                          {item.tags.split(',').map((tag) => (
+                            <span className="kit-item__tag" key={tag.trim()}>
+                              {tag.trim()}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {isShopPortal(portal) && (
+        <div className="shop-section">
+          <div className="shop-label">Currency</div>
+          <div className="shop-tabs" role="tablist" aria-label="Currencies">
+            {SHOP_CURRENCIES.map((currency) => (
+              <button
+                key={currency}
+                type="button"
+                className={`shop-tab${activeCurrency === currency ? ' is-active' : ''}`}
+                onClick={() => setActiveCurrency(currency)}
+                role="tab"
+                aria-selected={activeCurrency === currency}
+              >
+                {currency}
+              </button>
+            ))}
+          </div>
+          <div className="shop-label">Category</div>
+          <div className="shop-tabs" role="tablist" aria-label="Shop categories">
+            {SHOP_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                className={`shop-tab${activeShopTab === tab.key ? ' is-active' : ''}`}
+                onClick={() => setActiveShopTab(tab.key)}
+                role="tab"
+                aria-selected={activeShopTab === tab.key}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {getShop(portal).enabled ? (
+            <div className="shop-grid">
+              {getShop(portal).items
+                .filter((item) =>
+                  activeShopTab === 'all' ? true : item.category === activeShopTab
+                )
+                .map((item, itemIndex) => (
+                  <div className="shop-card" key={`${item.title}-${itemIndex}`}>
+                    <div className="shop-card__media media-protect media-protect--overlay">
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.title}
+                          onContextMenu={preventContextMenu}
+                          onDragStart={preventDragStart}
+                          onCopy={preventCopy}
+                          onCut={preventCopy}
+                          draggable={false}
+                        />
+                      ) : (
+                        <div className="shop-card__placeholder">Image</div>
+                      )}
+                    </div>
+                    <div className="shop-card__title">{item.title}</div>
+                    <div className="shop-card__price">
+                      {formatCurrencyAmount(
+                        getItemAmount(
+                          item,
+                          activeCurrency,
+                          getShop(portal).currency_rates
+                        ),
+                        activeCurrency
+                      )}
+                    </div>
+                    <button
+                      className="shop-card__cta"
+                      type="button"
+                      onClick={() => {
+                        setActiveShopItem(item)
+                        setActiveShopSize('')
+                      }}
+                    >
+                      View
+                    </button>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <p className="shop-closed">Shop is currently closed.</p>
+          )}
+        </div>
+      )}
+      {isWorkWithMePortal(portal) && (
+        <div className="work-form">
+          <div className="work-form__grid">
+            <label
+              className={`work-form__label${workFormFieldErrors.service ? ' work-form__label--error' : ''}`}
+            >
+              Service
+              <select
+                className={`work-form__input${workFormFieldErrors.service ? ' work-form__input--error' : ''}`}
+                value={workForm.service}
+                onChange={(event) =>
+                  updateWorkFormField('service', event.target.value)
+                }
+                required
+              >
+                <option value="">Select</option>
+                {getWorkFormConfig(portal).services.map((service) => (
+                  <option key={service} value={service}>
+                    {service}
+                  </option>
+                ))}
+              </select>
+              {workFormFieldErrors.service && (
+                <span className="work-form__hint">Required</span>
+              )}
+            </label>
+            <label
+              className={`work-form__label${workFormFieldErrors.name ? ' work-form__label--error' : ''}`}
+            >
+              Name
+              <input
+                className={`work-form__input${workFormFieldErrors.name ? ' work-form__input--error' : ''}`}
+                value={workForm.name}
+                onChange={(event) =>
+                  updateWorkFormField('name', event.target.value)
+                }
+                required
+              />
+              {workFormFieldErrors.name && (
+                <span className="work-form__hint">Required</span>
+              )}
+            </label>
+            <label
+              className={`work-form__label${workFormFieldErrors.industry ? ' work-form__label--error' : ''}`}
+            >
+              Profession / Industry
+              <select
+                className={`work-form__input${workFormFieldErrors.industry ? ' work-form__input--error' : ''}`}
+                value={workForm.industry}
+                onChange={(event) =>
+                  updateWorkFormField('industry', event.target.value)
+                }
+                required
+              >
+                <option value="">Select</option>
+                {getWorkFormConfig(portal).industries.map((industry) => (
+                  <option key={industry} value={industry}>
+                    {industry}
+                  </option>
+                ))}
+              </select>
+              {workFormFieldErrors.industry && (
+                <span className="work-form__hint">Required</span>
+              )}
+            </label>
+            <label className="work-form__label">
+              Other
+              <input
+                className="work-form__input"
+                value={workForm.other}
+                onChange={(event) =>
+                  updateWorkFormField('other', event.target.value)
+                }
+              />
+            </label>
+            <label
+              className={`work-form__label${workFormFieldErrors.email ? ' work-form__label--error' : ''}`}
+            >
+              Email
+              <input
+                className={`work-form__input${workFormFieldErrors.email ? ' work-form__input--error' : ''}`}
+                type="email"
+                value={workForm.email}
+                onChange={(event) =>
+                  updateWorkFormField('email', event.target.value)
+                }
+                required
+              />
+              {workFormFieldErrors.email && (
+                <span className="work-form__hint">Required</span>
+              )}
+            </label>
+            <label
+              className={`work-form__label${workFormFieldErrors.phone ? ' work-form__label--error' : ''}`}
+            >
+              Phone number
+              <input
+                className={`work-form__input${workFormFieldErrors.phone ? ' work-form__input--error' : ''}`}
+                value={workForm.phone}
+                onChange={(event) =>
+                  updateWorkFormField('phone', event.target.value)
+                }
+                required
+              />
+              {workFormFieldErrors.phone && (
+                <span className="work-form__hint">Required</span>
+              )}
+            </label>
+            <label
+              className={`work-form__label work-form__label--full${workFormFieldErrors.message ? ' work-form__label--error' : ''}`}
+            >
+              Message
+              <textarea
+                className={`work-form__input${workFormFieldErrors.message ? ' work-form__input--error' : ''}`}
+                value={workForm.message}
+                onChange={(event) =>
+                  updateWorkFormField('message', event.target.value)
+                }
+                rows={4}
+                required
+              />
+              {workFormFieldErrors.message && (
+                <span className="work-form__hint">Required</span>
+              )}
+            </label>
+            <label
+              className={`work-form__label work-form__label--full work-form__checkbox${workFormFieldErrors.agreement ? ' work-form__label--error' : ''}`}
+            >
+              <input
+                className={`work-form__input${workFormFieldErrors.agreement ? ' work-form__input--error' : ''}`}
+                type="checkbox"
+                checked={workForm.agreement}
+                onChange={(event) =>
+                  updateWorkFormField('agreement', event.target.checked)
+                }
+                required
+              />
+              <span>{getWorkFormConfig(portal).agreement_label}</span>
+              {workFormFieldErrors.agreement && (
+                <span className="work-form__hint">Required</span>
+              )}
+            </label>
+          </div>
+          <div className="work-form__grid">
+            <label
+              className={`work-form__label${workFormFieldErrors.date ? ' work-form__label--error' : ''}`}
+            >
+              Booking date
+              <input
+                className={`work-form__input${workFormFieldErrors.date ? ' work-form__input--error' : ''}`}
+                type="date"
+                min={todayDate}
+                value={workForm.date}
+                onChange={(event) => updateWorkFormField('date', event.target.value)}
+                required
+              />
+              {workFormFieldErrors.date && (
+                <span className="work-form__hint">Required</span>
+              )}
+            </label>
+            <label
+              className={`work-form__label${workFormFieldErrors.time ? ' work-form__label--error' : ''}`}
+            >
+              Time
+              <input
+                className={`work-form__input${workFormFieldErrors.time ? ' work-form__input--error' : ''}`}
+                type="time"
+                min={workForm.date === todayDate ? currentTime : undefined}
+                value={workForm.time}
+                onChange={(event) => updateWorkFormField('time', event.target.value)}
+                required
+              />
+              {workFormFieldErrors.time && (
+                <span className="work-form__hint">Required</span>
+              )}
+            </label>
+            <label
+              className={`work-form__label${workFormFieldErrors.timezone ? ' work-form__label--error' : ''}`}
+            >
+              Timezone
+              <select
+                className={`work-form__input${workFormFieldErrors.timezone ? ' work-form__input--error' : ''}`}
+                value={workForm.timezone}
+                onChange={(event) =>
+                  updateWorkFormField('timezone', event.target.value)
+                }
+                required
+              >
+                <option value="">Select</option>
+                {getWorkFormConfig(portal).timezones.map((timezone) => (
+                  <option key={timezone} value={timezone}>
+                    {timezone}
+                  </option>
+                ))}
+              </select>
+              {workFormFieldErrors.timezone && (
+                <span className="work-form__hint">Required</span>
+              )}
+            </label>
+            <label
+              className={`work-form__label${workFormFieldErrors.meeting_mode ? ' work-form__label--error' : ''}`}
+            >
+              Mode of meeting
+              <select
+                className={`work-form__input${workFormFieldErrors.meeting_mode ? ' work-form__input--error' : ''}`}
+                value={workForm.meeting_mode}
+                onChange={(event) =>
+                  updateWorkFormField('meeting_mode', event.target.value)
+                }
+                required
+              >
+                <option value="">Select</option>
+                {getWorkFormConfig(portal).meeting_modes.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode}
+                  </option>
+                ))}
+              </select>
+              {workFormFieldErrors.meeting_mode && (
+                <span className="work-form__hint">Required</span>
+              )}
+            </label>
+          </div>
+          {workFormError && <p className="work-form__error">{workFormError}</p>}
+          {workFormStatus && <p className="work-form__status">{workFormStatus}</p>}
+          <button
+            type="button"
+            className="work-form__submit"
+            onClick={handleWorkFormSubmit}
+          >
+            Book call
+          </button>
+        </div>
+      )}
+      {portal.href && portal.href !== '#' && (
+        <a className="modal__link" href={portal.href} target="_blank" rel="noreferrer">
+          Open link
+        </a>
+      )}
+    </>
+  )
 
   const updateWorkFormField = (field, value) => {
     setWorkForm((prevForm) => ({ ...prevForm, [field]: value }))
@@ -2429,20 +2984,58 @@ export default function App() {
         </div>
       </div>
 
+      {routePortal && (
+        <section className="portal-page">
+          <div className="portal-page__header">
+            <p className="portal-page__meta">{routePortal.portal.meta}</p>
+            <h1 className="portal-page__title">{routePortal.portal.title}</h1>
+            <Link className="portal-page__back" to="/">
+              Back to home
+            </Link>
+          </div>
+          <div className="portal-page__body">
+            {renderPortalContent(routePortal.portal, routePortal.index)}
+          </div>
+        </section>
+      )}
+
       <nav className="portal-grid mt-6 sm:mt-8" aria-label="Primary">
-        {portals.map((portal, index) => (
-          <a
-            key={portal.id ?? portal.meta}
-            data-animate
-            href={portal.href}
-            className="reveal portal-card"
-            onClick={(event) => handlePortalClick(portal, index, event)}
-          >
-            <div className="portal-card__meta">{portal.meta}</div>
-            <h2 className="portal-card__title font-title">{portal.title}</h2>
-            <span className="portal-card__glow" aria-hidden="true"></span>
-          </a>
-        ))}
+        {portals.map((portal, index) => {
+          const route = portalRoutes.find((item) => item.index === index)
+          const content = (
+            <>
+              <div className="portal-card__meta">{portal.meta}</div>
+              <h2 className="portal-card__title font-title">{portal.title}</h2>
+              <span className="portal-card__glow" aria-hidden="true"></span>
+            </>
+          )
+
+          if (portal.href && portal.href !== '#') {
+            return (
+              <a
+                key={portal.id ?? portal.meta}
+                data-animate
+                href={portal.href}
+                className="reveal portal-card"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {content}
+              </a>
+            )
+          }
+
+          return (
+            <Link
+              key={portal.id ?? portal.meta}
+              data-animate
+              to={route?.path || '/'}
+              className="reveal portal-card"
+            >
+              {content}
+            </Link>
+          )
+        })}
       </nav>
 
       {aboutModalOpen && (
@@ -2537,6 +3130,176 @@ export default function App() {
                     </ul>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeShopItem && activeContentPortal && isShopPortal(activeContentPortal) && (
+        <div
+          className="shop-detail-backdrop"
+          role="presentation"
+          onClick={() => {
+            setActiveShopItem(null)
+            setActiveShopSize('')
+            setCheckoutForm({
+              fullName: '',
+              address: '',
+              email: '',
+              phone: '',
+            })
+            setCheckoutError('')
+            setCheckoutStatus('')
+          }}
+        >
+          <div
+            className="shop-detail"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="shop-detail__close"
+              onClick={() => {
+                setActiveShopItem(null)
+                setActiveShopSize('')
+                setCheckoutForm({
+                  fullName: '',
+                  address: '',
+                  email: '',
+                  phone: '',
+                })
+                setCheckoutError('')
+                setCheckoutStatus('')
+              }}
+            >
+              Close
+            </button>
+            <div
+              className="shop-detail__media media-protect media-protect--overlay"
+              onContextMenu={preventContextMenu}
+              onCopy={preventCopy}
+              onCut={preventCopy}
+            >
+              {(activeShopItem.images?.length
+                ? activeShopItem.images
+                : activeShopItem.image
+                  ? [activeShopItem.image]
+                  : []
+              ).map((src, index) => (
+                <img
+                  src={src}
+                  alt={activeShopItem.title}
+                  key={`${src}-${index}`}
+                  onContextMenu={preventContextMenu}
+                  onDragStart={preventDragStart}
+                  onCopy={preventCopy}
+                  onCut={preventCopy}
+                  draggable={false}
+                />
+              ))}
+            </div>
+            <div className="shop-detail__info">
+              <div className="shop-detail__title">{activeShopItem.title}</div>
+              <div className="shop-detail__price">
+                {formatCurrencyAmount(
+                  getItemAmount(
+                    activeShopItem,
+                    activeCurrency,
+                    getShop(activeContentPortal).currency_rates
+                  ),
+                  activeCurrency
+                )}
+              </div>
+              {activeShopItem.description && (
+                <p className="shop-detail__description">
+                  {activeShopItem.description}
+                </p>
+              )}
+              {activeShopItem.sizes?.length ? (
+                <div className="shop-detail__sizes">
+                  {activeShopItem.sizes.map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      className={activeShopSize === size ? 'is-active' : ''}
+                      onClick={() => setActiveShopSize(size)}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <div className="shop-detail__form">
+                <label className="shop-detail__label">
+                  Full name
+                  <input
+                    value={checkoutForm.fullName}
+                    onChange={(event) =>
+                      setCheckoutForm({
+                        ...checkoutForm,
+                        fullName: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+                <label className="shop-detail__label">
+                  Delivery address
+                  <input
+                    value={checkoutForm.address}
+                    onChange={(event) =>
+                      setCheckoutForm({
+                        ...checkoutForm,
+                        address: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+                <label className="shop-detail__label">
+                  Email address
+                  <input
+                    type="email"
+                    value={checkoutForm.email}
+                    onChange={(event) =>
+                      setCheckoutForm({
+                        ...checkoutForm,
+                        email: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+                <label className="shop-detail__label">
+                  Phone number
+                  <input
+                    value={checkoutForm.phone}
+                    onChange={(event) =>
+                      setCheckoutForm({
+                        ...checkoutForm,
+                        phone: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </label>
+                {checkoutError && (
+                  <p className="shop-detail__error">{checkoutError}</p>
+                )}
+                {checkoutStatus && (
+                  <p className="shop-detail__status">{checkoutStatus}</p>
+                )}
+                <button
+                  className="shop-detail__checkout"
+                  type="button"
+                  onClick={handleCheckoutSubmit}
+                  disabled={!activeShopSize}
+                >
+                  Proceed to checkout
+                </button>
               </div>
             </div>
           </div>
