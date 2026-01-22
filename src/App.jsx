@@ -72,6 +72,8 @@ export default function App() {
   const [activeCurrency, setActiveCurrency] = useState('NGN')
   const [aboutExpanded, setAboutExpanded] = useState(false)
   const [aboutModalOpen, setAboutModalOpen] = useState(false)
+  const [activeMedia, setActiveMedia] = useState(null)
+  const [activeMediaType, setActiveMediaType] = useState(null)
   const location = useLocation()
   const navigate = useNavigate()
   const [checkoutForm, setCheckoutForm] = useState({
@@ -104,6 +106,7 @@ export default function App() {
   const [workFormError, setWorkFormError] = useState('')
   const [workFormStatus, setWorkFormStatus] = useState('')
   const [workFormFieldErrors, setWorkFormFieldErrors] = useState({})
+  const [activeNavCardIndex, setActiveNavCardIndex] = useState(0)
   const [currentTime, setCurrentTime] = useState(
     new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   )
@@ -111,6 +114,8 @@ export default function App() {
   const defaultLogoUrl = new URL('./assets/vakes-logo.png', import.meta.url).href
   const [serviceCarouselIndex, setServiceCarouselIndex] = useState({})
   const serviceSwipeState = useRef({})
+
+  const isServicesPortal = (_portal, index) => index === 0
 
   const isSuccessKitPortal = (portal) => {
     const meta = portal?.meta?.toLowerCase() || ''
@@ -430,6 +435,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isAdminView])
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+  }, [location.pathname])
+
+  useEffect(() => {
+    setActivePortal(null)
+    setActivePortalIndex(null)
+    setActiveShopItem(null)
+  }, [location.pathname])
+
   const isAdminUser = useMemo(
     () => session?.user?.email?.toLowerCase() === ADMIN_EMAIL,
     [session]
@@ -488,8 +503,6 @@ export default function App() {
       isMounted = false
     }
   }, [isAdminView, isAdminUser])
-
-  const isServicesPortal = (_portal, index) => index === 0
 
   const SUCCESS_KIT_SECTIONS = [
     { key: 'assets', label: 'Assets' },
@@ -883,6 +896,25 @@ export default function App() {
     navigate(target.path)
   }
 
+  const openMediaViewer = (url) => {
+    if (!url) {
+      return
+    }
+    const youtube = getYouTubeEmbedUrl(url)
+    if (youtube) {
+      setActiveMedia(youtube)
+      setActiveMediaType('youtube')
+      return
+    }
+    if (isVideoUrl(url)) {
+      setActiveMedia(url)
+      setActiveMediaType('video')
+      return
+    }
+    setActiveMedia(url)
+    setActiveMediaType('image')
+  }
+
   const handleSuccessKitChange = (
     portalIndex,
     sectionKey,
@@ -1222,6 +1254,7 @@ export default function App() {
                                 title={service.title}
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                 allowFullScreen
+                                onClick={() => openMediaViewer(currentItem)}
                               ></iframe>
                             ) : isVideoUrl(currentItem) ? (
                               <video
@@ -1237,6 +1270,7 @@ export default function App() {
                                 onContextMenu={preventContextMenu}
                                 onCopy={preventCopy}
                                 onCut={preventCopy}
+                                onClick={() => openMediaViewer(currentItem)}
                               />
                             ) : (
                               <img
@@ -1247,6 +1281,7 @@ export default function App() {
                                 onCopy={preventCopy}
                                 onCut={preventCopy}
                                 draggable={false}
+                                onClick={() => openMediaViewer(currentItem)}
                               />
                             )}
                           </div>
@@ -1361,20 +1396,18 @@ export default function App() {
       {isShopPortal(portal) && (
         <div className="shop-section">
           <div className="shop-label">Currency</div>
-          <div className="shop-tabs" role="tablist" aria-label="Currencies">
+          <select
+            className="shop-select"
+            value={activeCurrency}
+            onChange={(event) => setActiveCurrency(event.target.value)}
+            aria-label="Currency"
+          >
             {SHOP_CURRENCIES.map((currency) => (
-              <button
-                key={currency}
-                type="button"
-                className={`shop-tab${activeCurrency === currency ? ' is-active' : ''}`}
-                onClick={() => setActiveCurrency(currency)}
-                role="tab"
-                aria-selected={activeCurrency === currency}
-              >
+              <option key={currency} value={currency}>
                 {currency}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
           <div className="shop-label">Category</div>
           <div className="shop-tabs" role="tablist" aria-label="Shop categories">
             {SHOP_TABS.map((tab) => (
@@ -1408,6 +1441,7 @@ export default function App() {
                           onCopy={preventCopy}
                           onCut={preventCopy}
                           draggable={false}
+                          onClick={() => openMediaViewer(item.image)}
                         />
                       ) : (
                         <div className="shop-card__placeholder">Image</div>
@@ -2075,9 +2109,31 @@ export default function App() {
                     Add card
                   </button>
                 </div>
-                <div className="admin__list">
+                <div className="admin__tabs">
                   {draftPortals.map((portal, index) => (
-                    <div className="admin__card" key={`${portal.id}-${index}`}>
+                    <button
+                      type="button"
+                      key={`${portal.id}-${index}`}
+                      className={activeNavCardIndex === index ? 'is-active' : ''}
+                      onClick={() => setActiveNavCardIndex(index)}
+                    >
+                      {portal.meta || `Card ${index + 1}`}
+                    </button>
+                  ))}
+                </div>
+                <div className="admin__portal-list">
+                  {draftPortals
+                    .filter((_portal, index) => index === activeNavCardIndex)
+                    .map((portal) => {
+                      const portalIndex = activeNavCardIndex
+                      return (
+                    <div className="admin__section admin__section--panel" key={`${portal.id}-${portalIndex}`}>
+                      <div className="admin__section-header">
+                        <h3 className="admin__subtitle">
+                          {portal.meta || `Card ${portalIndex + 1}`}
+                        </h3>
+                      </div>
+                      <div className="admin__card">
                       <div className="admin__grid admin__grid--two">
                         <label className="admin__label">
                           Meta
@@ -2086,7 +2142,7 @@ export default function App() {
                             value={portal.meta || ''}
                             onChange={(event) =>
                               handlePortalChange(
-                                index,
+                                portalIndex,
                                 'meta',
                                 event.target.value
                               )
@@ -2100,7 +2156,7 @@ export default function App() {
                             value={portal.title || ''}
                             onChange={(event) =>
                               handlePortalChange(
-                                index,
+                                portalIndex,
                                 'title',
                                 event.target.value
                               )
@@ -2114,7 +2170,7 @@ export default function App() {
                             value={portal.href || ''}
                             onChange={(event) =>
                               handlePortalChange(
-                                index,
+                                portalIndex,
                                 'href',
                                 event.target.value
                               )
@@ -2122,14 +2178,14 @@ export default function App() {
                           />
                         </label>
                       </div>
-                      {isServicesPortal(portal, index) && (
+                      {isServicesPortal(portal, portalIndex) && (
                         <div className="admin__services">
                           <div className="admin__section-header">
                             <h3 className="admin__subtitle">Services List</h3>
                             <button
                               type="button"
                               className="admin__button admin__button--ghost"
-                              onClick={() => handleAddService(index)}
+                              onClick={() => handleAddService(portalIndex)}
                             >
                               Add service
                             </button>
@@ -2151,7 +2207,7 @@ export default function App() {
                                       value={service.title || ''}
                                       onChange={(event) =>
                                         handleServiceChange(
-                                          index,
+                                          portalIndex,
                                           serviceIndex,
                                           'title',
                                           event.target.value
@@ -2166,7 +2222,7 @@ export default function App() {
                                       value={service.image || ''}
                                       onChange={(event) =>
                                         handleServiceChange(
-                                          index,
+                                          portalIndex,
                                           serviceIndex,
                                           'image',
                                           event.target.value
@@ -2188,7 +2244,7 @@ export default function App() {
                                           value={item}
                                           onChange={(event) =>
                                             handleServiceMediaChange(
-                                              index,
+                                              portalIndex,
                                               serviceIndex,
                                               mediaIndex,
                                               event.target.value
@@ -2200,7 +2256,7 @@ export default function App() {
                                           className="admin__button admin__button--ghost"
                                           onClick={() =>
                                             handleRemoveServiceMedia(
-                                              index,
+                                              portalIndex,
                                               serviceIndex,
                                               mediaIndex
                                             )
@@ -2214,7 +2270,7 @@ export default function App() {
                                       type="button"
                                       className="admin__button admin__button--ghost"
                                       onClick={() =>
-                                        handleAddServiceMedia(index, serviceIndex)
+                                        handleAddServiceMedia(portalIndex, serviceIndex)
                                       }
                                     >
                                       Add media
@@ -2227,7 +2283,7 @@ export default function App() {
                                       value={service.description || ''}
                                       onChange={(event) =>
                                         handleServiceChange(
-                                          index,
+                                          portalIndex,
                                           serviceIndex,
                                           'description',
                                           event.target.value
@@ -2241,7 +2297,7 @@ export default function App() {
                                   type="button"
                                   className="admin__button admin__button--ghost"
                                   onClick={() =>
-                                    handleRemoveService(index, serviceIndex)
+                                    handleRemoveService(portalIndex, serviceIndex)
                                   }
                                 >
                                   Remove service
@@ -2263,7 +2319,7 @@ export default function App() {
                                     type="button"
                                     className="admin__button admin__button--ghost"
                                     onClick={() =>
-                                      handleAddSuccessKitItem(index, section.key)
+                                      handleAddSuccessKitItem(portalIndex, section.key)
                                     }
                                   >
                                     Add item
@@ -2283,7 +2339,7 @@ export default function App() {
                                             value={item.title || ''}
                                             onChange={(event) =>
                                               handleSuccessKitChange(
-                                                index,
+                                                portalIndex,
                                                 section.key,
                                                 itemIndex,
                                                 'title',
@@ -2299,7 +2355,7 @@ export default function App() {
                                             value={item.tags || ''}
                                             onChange={(event) =>
                                               handleSuccessKitChange(
-                                                index,
+                                                portalIndex,
                                                 section.key,
                                                 itemIndex,
                                                 'tags',
@@ -2315,7 +2371,7 @@ export default function App() {
                                             value={item.link || ''}
                                             onChange={(event) =>
                                               handleSuccessKitChange(
-                                                index,
+                                                portalIndex,
                                                 section.key,
                                                 itemIndex,
                                                 'link',
@@ -2333,7 +2389,7 @@ export default function App() {
                                         className="admin__button admin__button--ghost"
                                         onClick={() =>
                                           handleRemoveSuccessKitItem(
-                                            index,
+                                            portalIndex,
                                             section.key,
                                             itemIndex
                                           )
@@ -2358,7 +2414,7 @@ export default function App() {
                                 type="checkbox"
                                 checked={getShop(portal).enabled}
                                 onChange={(event) =>
-                                  handleShopToggle(index, event.target.checked)
+                                  handleShopToggle(portalIndex, event.target.checked)
                                 }
                               />
                               <span>Shop open</span>
@@ -2372,7 +2428,7 @@ export default function App() {
                                 value={getShop(portal).currency || 'NGN'}
                                 onChange={(event) =>
                                   handleShopConfigChange(
-                                    index,
+                                    portalIndex,
                                     'currency',
                                     event.target.value
                                   )
@@ -2391,7 +2447,7 @@ export default function App() {
                                 value={getShop(portal).currency_rates?.USD ?? ''}
                                 onChange={(event) =>
                                   handleShopConfigChange(
-                                    index,
+                                    portalIndex,
                                     'currency_rates',
                                     {
                                       ...getShop(portal).currency_rates,
@@ -2409,7 +2465,7 @@ export default function App() {
                                 value={getShop(portal).currency_rates?.GBP ?? ''}
                                 onChange={(event) =>
                                   handleShopConfigChange(
-                                    index,
+                                    portalIndex,
                                     'currency_rates',
                                     {
                                       ...getShop(portal).currency_rates,
@@ -2427,7 +2483,7 @@ export default function App() {
                                 value={getShop(portal).currency_rates?.EUR ?? ''}
                                 onChange={(event) =>
                                   handleShopConfigChange(
-                                    index,
+                                    portalIndex,
                                     'currency_rates',
                                     {
                                       ...getShop(portal).currency_rates,
@@ -2444,7 +2500,7 @@ export default function App() {
                             <button
                               type="button"
                               className="admin__button admin__button--ghost"
-                              onClick={() => handleAddShopItem(index)}
+                              onClick={() => handleAddShopItem(portalIndex)}
                             >
                               Add product
                             </button>
@@ -2463,7 +2519,7 @@ export default function App() {
                                       value={item.title || ''}
                                       onChange={(event) =>
                                         handleShopItemChange(
-                                          index,
+                                          portalIndex,
                                           itemIndex,
                                           'title',
                                           event.target.value
@@ -2478,7 +2534,7 @@ export default function App() {
                                       value={item.price_ngn ?? ''}
                                       onChange={(event) =>
                                         handleShopItemChange(
-                                          index,
+                                          portalIndex,
                                           itemIndex,
                                           'price_ngn',
                                           Number.parseFloat(event.target.value) || 0
@@ -2493,7 +2549,7 @@ export default function App() {
                                       value={item.image || ''}
                                       onChange={(event) =>
                                         handleShopItemChange(
-                                          index,
+                                          portalIndex,
                                           itemIndex,
                                           'image',
                                           event.target.value
@@ -2508,7 +2564,7 @@ export default function App() {
                                       value={(item.images || []).join(', ')}
                                       onChange={(event) =>
                                         handleShopItemChange(
-                                          index,
+                                          portalIndex,
                                           itemIndex,
                                           'images',
                                           event.target.value
@@ -2526,7 +2582,7 @@ export default function App() {
                                       value={(item.sizes || []).join(', ')}
                                       onChange={(event) =>
                                         handleShopItemChange(
-                                          index,
+                                          portalIndex,
                                           itemIndex,
                                           'sizes',
                                           event.target.value
@@ -2544,7 +2600,7 @@ export default function App() {
                                       value={item.description || ''}
                                       onChange={(event) =>
                                         handleShopItemChange(
-                                          index,
+                                          portalIndex,
                                           itemIndex,
                                           'description',
                                           event.target.value
@@ -2560,7 +2616,7 @@ export default function App() {
                                       value={item.category || 'art'}
                                       onChange={(event) =>
                                         handleShopItemChange(
-                                          index,
+                                          portalIndex,
                                           itemIndex,
                                           'category',
                                           event.target.value
@@ -2576,7 +2632,7 @@ export default function App() {
                                 <button
                                   type="button"
                                   className="admin__button admin__button--ghost"
-                                  onClick={() => handleRemoveShopItem(index, itemIndex)}
+                                  onClick={() => handleRemoveShopItem(portalIndex, itemIndex)}
                                 >
                                   Remove product
                                 </button>
@@ -2599,7 +2655,7 @@ export default function App() {
                                   ', '
                                 )}
                                 onChange={(event) =>
-                                  handleShopConfigChange(index, 'work_form', {
+                                  handleShopConfigChange(portalIndex, 'work_form', {
                                     ...getWorkFormConfig(portal),
                                     services: event.target.value
                                       .split(',')
@@ -2617,7 +2673,7 @@ export default function App() {
                                   ', '
                                 )}
                                 onChange={(event) =>
-                                  handleShopConfigChange(index, 'work_form', {
+                                  handleShopConfigChange(portalIndex, 'work_form', {
                                     ...getWorkFormConfig(portal),
                                     industries: event.target.value
                                       .split(',')
@@ -2635,7 +2691,7 @@ export default function App() {
                                   getWorkFormConfig(portal).meeting_modes || []
                                 ).join(', ')}
                                 onChange={(event) =>
-                                  handleShopConfigChange(index, 'work_form', {
+                                  handleShopConfigChange(portalIndex, 'work_form', {
                                     ...getWorkFormConfig(portal),
                                     meeting_modes: event.target.value
                                       .split(',')
@@ -2653,7 +2709,7 @@ export default function App() {
                                   ', '
                                 )}
                                 onChange={(event) =>
-                                  handleShopConfigChange(index, 'work_form', {
+                                  handleShopConfigChange(portalIndex, 'work_form', {
                                     ...getWorkFormConfig(portal),
                                     timezones: event.target.value
                                       .split(',')
@@ -2669,7 +2725,7 @@ export default function App() {
                                 className="admin__input"
                                 value={getWorkFormConfig(portal).agreement_label || ''}
                                 onChange={(event) =>
-                                  handleShopConfigChange(index, 'work_form', {
+                                  handleShopConfigChange(portalIndex, 'work_form', {
                                     ...getWorkFormConfig(portal),
                                     agreement_label: event.target.value,
                                   })
@@ -2682,12 +2738,14 @@ export default function App() {
                       <button
                         type="button"
                         className="admin__button admin__button--ghost"
-                        onClick={() => handleRemovePortal(index)}
+                        onClick={() => handleRemovePortal(portalIndex)}
                       >
                         Remove
                       </button>
+                      </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
               )}
@@ -2862,7 +2920,8 @@ export default function App() {
 
   return (
     <div className="page mx-auto max-w-3xl px-5 pb-10 pt-9 sm:px-6 sm:pb-16 sm:pt-12">
-      <header className="hero-card">
+      {!routePortal && (
+        <header className="hero-card">
         <div className="hero-card__inner flex flex-col items-center text-center">
           <p className="hero-card__eyebrow">{site.hero_eyebrow}</p>
           <div className="mt-4">
@@ -2873,16 +2932,17 @@ export default function App() {
                 onCopy={preventCopy}
                 onCut={preventCopy}
               >
-                <iframe
-                  src={getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url))}
-                  title="VAKES World"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                ></iframe>
-              </div>
-            ) : isVideoUrl(resolveHeroMediaUrl(site.logo_url)) ? (
-              <video
-                className="hero-logo h-auto w-[220px] max-w-full"
+                  <iframe
+                    src={getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url))}
+                    title="VAKES World"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    onClick={() => openMediaViewer(resolveHeroMediaUrl(site.logo_url))}
+                  ></iframe>
+                </div>
+              ) : isVideoUrl(resolveHeroMediaUrl(site.logo_url)) ? (
+                <video
+                  className="hero-logo h-auto w-[220px] max-w-full"
                 src={resolveHeroMediaUrl(site.logo_url)}
                 autoPlay
                 loop
@@ -2891,24 +2951,26 @@ export default function App() {
                 controlsList="nodownload noplaybackrate noremoteplayback"
                 disablePictureInPicture
                 disableRemotePlayback
-                onContextMenu={preventContextMenu}
-                onCopy={preventCopy}
-                onCut={preventCopy}
-              />
-            ) : (
-              <div className="media-protect media-protect--overlay">
-                <img
-                  src={resolveHeroMediaUrl(site.logo_url)}
+                  onContextMenu={preventContextMenu}
+                  onCopy={preventCopy}
+                  onCut={preventCopy}
+                  onClick={() => openMediaViewer(resolveHeroMediaUrl(site.logo_url))}
+                />
+              ) : (
+                <div className="media-protect media-protect--overlay">
+                  <img
+                    src={resolveHeroMediaUrl(site.logo_url)}
                   alt="VAKES World"
                   className="hero-logo h-auto w-[220px] max-w-full"
                   onContextMenu={preventContextMenu}
-                  onDragStart={preventDragStart}
-                  onCopy={preventCopy}
-                  onCut={preventCopy}
-                  draggable={false}
-                />
-              </div>
-            )}
+                    onDragStart={preventDragStart}
+                    onCopy={preventCopy}
+                    onCut={preventCopy}
+                    draggable={false}
+                    onClick={() => openMediaViewer(resolveHeroMediaUrl(site.logo_url))}
+                  />
+                </div>
+              )}
           </div>
           <p className="hero-card__tagline">{site.hero_tagline}</p>
           <p className="hero-card__subline">{site.hero_subline}</p>
@@ -2958,7 +3020,8 @@ export default function App() {
           </div>
         </div>
         <div className="hero__confetti" aria-hidden="true"></div>
-      </header>
+        </header>
+      )}
 
       <div className="about-dock">
         <div className={`about-dock__button${aboutExpanded ? ' is-open' : ''}`}>
@@ -2988,8 +3051,10 @@ export default function App() {
         <section className="portal-page">
           <div className="portal-page__header">
             <p className="portal-page__meta">{routePortal.portal.meta}</p>
-            <h1 className="portal-page__title">{routePortal.portal.title}</h1>
-            <Link className="portal-page__back" to="/">
+            <h1 className="portal-page__title font-title">
+              {routePortal.portal.title}
+            </h1>
+            <Link className="portal-page__back" to="/" onClick={() => window.location.assign('/')}>
               Back to home
             </Link>
           </div>
@@ -2999,44 +3064,46 @@ export default function App() {
         </section>
       )}
 
-      <nav className="portal-grid mt-6 sm:mt-8" aria-label="Primary">
-        {portals.map((portal, index) => {
-          const route = portalRoutes.find((item) => item.index === index)
-          const content = (
-            <>
-              <div className="portal-card__meta">{portal.meta}</div>
-              <h2 className="portal-card__title font-title">{portal.title}</h2>
-              <span className="portal-card__glow" aria-hidden="true"></span>
-            </>
-          )
+      {!routePortal && (
+        <nav className="portal-grid mt-6 sm:mt-8" aria-label="Primary">
+          {portals.map((portal, index) => {
+            const route = portalRoutes.find((item) => item.index === index)
+            const content = (
+              <>
+                <div className="portal-card__meta">{portal.meta}</div>
+                <h2 className="portal-card__title font-title">{portal.title}</h2>
+                <span className="portal-card__glow" aria-hidden="true"></span>
+              </>
+            )
 
-          if (portal.href && portal.href !== '#') {
+            if (portal.href && portal.href !== '#') {
+              return (
+                <a
+                  key={portal.id ?? portal.meta}
+                  data-animate
+                  href={portal.href}
+                  className="reveal portal-card"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {content}
+                </a>
+              )
+            }
+
             return (
-              <a
+              <Link
                 key={portal.id ?? portal.meta}
                 data-animate
-                href={portal.href}
+                to={route?.path || '/'}
                 className="reveal portal-card"
-                target="_blank"
-                rel="noreferrer"
               >
                 {content}
-              </a>
+              </Link>
             )
-          }
-
-          return (
-            <Link
-              key={portal.id ?? portal.meta}
-              data-animate
-              to={route?.path || '/'}
-              className="reveal portal-card"
-            >
-              {content}
-            </Link>
-          )
-        })}
-      </nav>
+          })}
+        </nav>
+      )}
 
       {aboutModalOpen && (
         <div
@@ -3072,6 +3139,7 @@ export default function App() {
                     onCopy={preventCopy}
                     onCut={preventCopy}
                     draggable={false}
+                    onClick={() => openMediaViewer(getAboutSection(site).image_url)}
                   />
                 </div>
               ) : null}
@@ -3198,6 +3266,7 @@ export default function App() {
                   onCopy={preventCopy}
                   onCut={preventCopy}
                   draggable={false}
+                  onClick={() => openMediaViewer(src)}
                 />
               ))}
             </div>
@@ -3301,6 +3370,50 @@ export default function App() {
                   Proceed to checkout
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeMedia && (
+        <div
+          className="modal-backdrop media-viewer"
+          role="presentation"
+          onClick={() => {
+            setActiveMedia(null)
+            setActiveMediaType(null)
+          }}
+        >
+          <div
+            className="modal media-viewer__modal"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="modal__close"
+              onClick={() => {
+                setActiveMedia(null)
+                setActiveMediaType(null)
+              }}
+              aria-label="Close media"
+            >
+              Close
+            </button>
+            <div className="media-viewer__content">
+              {activeMediaType === 'youtube' ? (
+                <iframe
+                  src={activeMedia}
+                  title="Media"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                ></iframe>
+              ) : activeMediaType === 'video' ? (
+                <video src={activeMedia} controls playsInline />
+              ) : (
+                <img src={activeMedia} alt="Media" />
+              )}
             </div>
           </div>
         </div>
@@ -3527,20 +3640,18 @@ export default function App() {
             {isShopPortal(activePortal) && (
               <div className="shop-panel">
                 <div className="shop-label">Currency</div>
-                <div className="shop-currency">
+                <select
+                  className="shop-select"
+                  value={activeCurrency}
+                  onChange={(event) => setActiveCurrency(event.target.value)}
+                  aria-label="Currency"
+                >
                   {SHOP_CURRENCIES.map((currency) => (
-                    <button
-                      key={currency}
-                      type="button"
-                      className={`shop-currency__button${
-                        activeCurrency === currency ? ' is-active' : ''
-                      }`}
-                      onClick={() => setActiveCurrency(currency)}
-                    >
+                    <option key={currency} value={currency}>
                       {currency}
-                    </button>
+                    </option>
                   ))}
-                </div>
+                </select>
                 <div className="shop-label">Category</div>
                 <div className="shop-tabs" role="tablist" aria-label="Shop categories">
                   {SHOP_TABS.map((tab) => (

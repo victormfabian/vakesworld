@@ -48,7 +48,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
 }
 
@@ -57,12 +57,17 @@
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--grey);
+  text-align: center;
+  width: 100%;
 }
 
 .portal-page__title {
   font-size: 2rem;
   letter-spacing: 0.02em;
   margin: 0;
+  font-family: "Oswald", "Trebuchet MS", Arial, sans-serif;
+  text-align: center;
+  width: 100%;
 }
 
 .portal-page__back {
@@ -71,10 +76,32 @@
   text-transform: uppercase;
   color: var(--grey);
   text-decoration: none;
+  position: fixed;
+  top: 16px;
+  right: 24px;
+  margin-left: 0;
+  width: auto;
+  text-align: center;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 6px 10px;
+  border-radius: 999px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
 }
 
 .portal-page__back:hover {
   color: #1f1f1f;
+}
+
+@media (max-width: 640px) {
+  .portal-page__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .portal-page__back {
+    right: 16px;
+  }
 }
 
 .portal-page__body {
@@ -517,6 +544,43 @@
   position: absolute;
   inset: 0;
   background: transparent;
+  pointer-events: none;
+}
+
+.media-protect img,
+.media-protect video,
+.media-protect iframe {
+  cursor: zoom-in;
+}
+
+.media-viewer__modal {
+  max-width: 92vw;
+  max-height: 92vh;
+  width: min(920px, 92vw);
+  padding: 18px;
+}
+
+.media-viewer__content {
+  margin-top: 22px;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: min(70vh, 560px);
+}
+
+.media-viewer__content img,
+.media-viewer__content video,
+.media-viewer__content iframe {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border: 0;
+  border-radius: 12px;
+  background: #0f0f0f;
+}
+
+.media-viewer__content video {
+  background: #000;
 }
 
 .about-modal__content {
@@ -777,6 +841,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-bottom: 14px;
+}
+
+.shop-select {
+  border: 2px solid var(--grey);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #ffffff;
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
   margin-bottom: 14px;
 }
 
@@ -1229,16 +1304,18 @@
   gap: 22px;
 }
 
-.admin__nav {
+.admin__nav,
+.admin__tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 14px;
 }
 
-.admin__nav button {
-  border: 0;
-  background: #f1f1f1;
-  padding: 8px 12px;
+.admin__nav button,
+.admin__tabs button {
+  border: 2px solid var(--grey);
+  background: #f7f7f7;
+  padding: 8px 14px;
   border-radius: 999px;
   font-size: 0.7rem;
   letter-spacing: 0.18em;
@@ -1247,9 +1324,12 @@
   cursor: pointer;
 }
 
-.admin__nav button.is-active {
+.admin__nav button.is-active,
+.admin__tabs button.is-active {
   background: var(--accent);
+  border-color: var(--accent);
 }
+
 
 .admin__section {
   padding-top: 18px;
@@ -1362,6 +1442,12 @@
   margin-top: 12px;
   display: grid;
   gap: 14px;
+}
+
+.admin__portal-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 18px;
 }
 
 .admin__card {
