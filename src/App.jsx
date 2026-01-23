@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   DEFAULT_ABOUT,
@@ -74,6 +74,7 @@ export default function App() {
   const [aboutModalOpen, setAboutModalOpen] = useState(false)
   const [activeMedia, setActiveMedia] = useState(null)
   const [activeMediaType, setActiveMediaType] = useState(null)
+  const [activeServiceTab, setActiveServiceTab] = useState('all')
   const location = useLocation()
   const navigate = useNavigate()
   const [checkoutForm, setCheckoutForm] = useState({
@@ -112,8 +113,6 @@ export default function App() {
   )
   const todayDate = new Date().toISOString().slice(0, 10)
   const defaultLogoUrl = new URL('./assets/vakes-logo.png', import.meta.url).href
-  const [serviceCarouselIndex, setServiceCarouselIndex] = useState({})
-  const serviceSwipeState = useRef({})
 
   const isServicesPortal = (_portal, index) => index === 0
 
@@ -166,6 +165,20 @@ export default function App() {
     return url
   }
 
+  const getServiceKey = (service, index) =>
+    slugify(service?.title) || `service-${index + 1}`
+
+  const getServicesFromPortal = (portal) =>
+    portal?.services?.length ? portal.services : DEFAULT_PORTALS[0].services
+
+  const getServiceTabs = (services) => [
+    { key: 'all', label: 'All' },
+    ...services.map((service, index) => ({
+      key: getServiceKey(service, index),
+      label: service?.title || `Service ${index + 1}`,
+    })),
+  ]
+
   const portalRoutes = useMemo(
     () =>
       portals.map((portal, index) => {
@@ -192,6 +205,18 @@ export default function App() {
   const routePortal = portalRoutes.find((item) => item.slug === routeSlug) || null
   const activeContentPortal = routePortal?.portal || activePortal
   const activeContentIndex = routePortal?.index ?? activePortalIndex
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return
+    }
+    const isServicesRoute =
+      routePortal && isServicesPortal(routePortal.portal, routePortal.index)
+    document.body.classList.toggle('no-scroll', Boolean(isServicesRoute))
+    return () => {
+      document.body.classList.remove('no-scroll')
+    }
+  }, [routePortal])
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -821,61 +846,6 @@ export default function App() {
     setDraftPortals(nextPortals)
   }
 
-  const handleServiceCarouselScroll = (event, direction) => {
-    const track = event.currentTarget
-      .closest('.service-carousel')
-      ?.querySelector('.service-carousel__track')
-    if (!track) {
-      return
-    }
-    const width = track.clientWidth
-    track.scrollBy({ left: width * direction, behavior: 'smooth' })
-  }
-
-  const handleServiceCarouselStep = (key, total, direction) => {
-    setServiceCarouselIndex((prevState) => {
-      const current = prevState[key] ?? 0
-      const next = (current + direction + total) % total
-      return { ...prevState, [key]: next }
-    })
-  }
-
-  const handleServiceCarouselPointerDown = (key, event) => {
-    if (!event.isPrimary) {
-      return
-    }
-    serviceSwipeState.current[key] = {
-      startX: event.clientX,
-      pointerId: event.pointerId,
-    }
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-
-  const handleServiceCarouselPointerUp = (key, total, event) => {
-    if (!event.isPrimary) {
-      return
-    }
-    const start = serviceSwipeState.current[key]
-    if (!start) {
-      return
-    }
-    const deltaX = event.clientX - start.startX
-    delete serviceSwipeState.current[key]
-    const threshold = 40
-    if (Math.abs(deltaX) < threshold) {
-      return
-    }
-    const direction = deltaX > 0 ? -1 : 1
-    handleServiceCarouselStep(key, total, direction)
-  }
-
-  const handleServiceCarouselPointerCancel = (key, event) => {
-    if (!event.isPrimary) {
-      return
-    }
-    delete serviceSwipeState.current[key]
-  }
-
   const preventContextMenu = (event) => {
     event.preventDefault()
   }
@@ -1202,133 +1172,92 @@ export default function App() {
     setWorkFormStatus('Request submitted. We will reach out soon.')
   }
 
-  const renderPortalContent = (portal, portalIndex) => (
-    <>
-      {isServicesPortal(portal, portalIndex) && (
+  const renderServiceList = (portal) => {
+    const services = getServicesFromPortal(portal)
+    const tabs = getServiceTabs(services)
+    const activeKey = tabs.some((tab) => tab.key === activeServiceTab)
+      ? activeServiceTab
+      : 'all'
+    const filteredServices =
+      activeKey === 'all'
+        ? services
+        : services.filter(
+            (service, index) => getServiceKey(service, index) === activeKey
+          )
+
+    return (
+      <div className="service-panel">
+        <div className="service-tabs" role="tablist" aria-label="Services">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`service-tab${activeKey === tab.key ? ' is-active' : ''}`}
+              onClick={() => setActiveServiceTab(tab.key)}
+              role="tab"
+              aria-selected={activeKey === tab.key}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
         <div className="service-list">
-          {(portal.services?.length ? portal.services : DEFAULT_PORTALS[0].services).map(
-            (service, index) => (
-              <details className="service-item" key={`${service.title}-${index}`}>
-                <summary className="service-summary">
-                  <span>{service.title}</span>
-                </summary>
+          {filteredServices.map((service, index) => {
+            const serviceTitle = service?.title || `Service ${index + 1}`
+            return (
+              <div className="service-item" key={`${serviceTitle}-${index}`}>
+                <div className="service-heading">{serviceTitle}</div>
                 <div className="service-body">
                   {(() => {
-                    const mediaItems = normalizeServiceMedia(service)
+                    const mediaItems = normalizeServiceMedia(service).slice().reverse()
                     if (!mediaItems.length) {
                       return null
                     }
-                    const key = `${service.title}-${index}`
-                    const currentIndex = serviceCarouselIndex[key] ?? 0
-                    const currentItem = mediaItems[currentIndex]
-                    const youtubeUrl = getYouTubeEmbedUrl(currentItem)
                     return (
-                      <div className="service-carousel">
-                        <div
-                          className="service-carousel__viewport media-protect"
-                          onPointerDown={(event) =>
-                            handleServiceCarouselPointerDown(key, event)
-                          }
-                          onPointerUp={(event) =>
-                            handleServiceCarouselPointerUp(
-                              key,
-                              mediaItems.length,
-                              event
-                            )
-                          }
-                          onPointerCancel={(event) =>
-                            handleServiceCarouselPointerCancel(key, event)
-                          }
-                          onContextMenu={preventContextMenu}
-                          onCopy={preventCopy}
-                          onCut={preventCopy}
-                        >
-                          <div className="service-carousel__item">
-                            {!currentItem ? (
-                              <div className="service-carousel__placeholder">
-                                Media unavailable
-                              </div>
-                            ) : youtubeUrl ? (
-                              <iframe
-                                src={youtubeUrl}
-                                title={service.title}
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                                onClick={() => openMediaViewer(currentItem)}
-                              ></iframe>
-                            ) : isVideoUrl(currentItem) ? (
-                              <video
-                                src={currentItem}
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
-                                controls
-                                controlsList="nodownload noplaybackrate noremoteplayback"
-                                disablePictureInPicture
-                                disableRemotePlayback
-                                onContextMenu={preventContextMenu}
-                                onCopy={preventCopy}
-                                onCut={preventCopy}
-                                onClick={() => openMediaViewer(currentItem)}
-                              />
-                            ) : (
-                              <img
-                                src={currentItem}
-                                alt={service.title}
-                                onContextMenu={preventContextMenu}
-                                onDragStart={preventDragStart}
-                                onCopy={preventCopy}
-                                onCut={preventCopy}
-                                draggable={false}
-                                onClick={() => openMediaViewer(currentItem)}
-                              />
-                            )}
-                          </div>
-                        </div>
-                        {mediaItems.length > 1 && (
-                          <div className="service-carousel__controls">
-                            {currentIndex > 0 ? (
-                              <button
-                                type="button"
-                                className="service-carousel__nav"
-                                onClick={() =>
-                                  handleServiceCarouselStep(
-                                    key,
-                                    mediaItems.length,
-                                    -1
-                                  )
-                                }
-                                aria-label="Previous media"
-                              >
-                                &lt;
-                              </button>
-                            ) : (
-                              <span className="service-carousel__spacer"></span>
-                            )}
-                            <div className="service-carousel__count">
-                              {currentIndex + 1} / {mediaItems.length}
+                      <div className="service-media-list">
+                        {mediaItems.map((item, mediaIndex) => {
+                          const youtubeUrl = getYouTubeEmbedUrl(item)
+                          return (
+                            <div
+                              className="service-media-item media-protect"
+                              key={`${serviceTitle}-${mediaIndex}`}
+                              onContextMenu={preventContextMenu}
+                              onCopy={preventCopy}
+                              onCut={preventCopy}
+                            >
+                              {youtubeUrl ? (
+                                <iframe
+                                  src={youtubeUrl}
+                                  title={serviceTitle}
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                  allowFullScreen
+                                  onClick={() => openMediaViewer(item)}
+                                ></iframe>
+                              ) : isVideoUrl(item) ? (
+                                <video
+                                  src={item}
+                                  autoPlay
+                                  loop
+                                  muted
+                                  playsInline
+                                  controls
+                                  controlsList="nodownload noplaybackrate noremoteplayback"
+                                  disablePictureInPicture
+                                  disableRemotePlayback
+                                  onClick={() => openMediaViewer(item)}
+                                />
+                              ) : (
+                                <img
+                                  src={item}
+                                  alt={serviceTitle}
+                                  onDragStart={preventDragStart}
+                                  draggable={false}
+                                  onClick={() => openMediaViewer(item)}
+                                />
+                              )}
                             </div>
-                            {currentIndex < mediaItems.length - 1 ? (
-                              <button
-                                type="button"
-                                className="service-carousel__nav"
-                                onClick={() =>
-                                  handleServiceCarouselStep(
-                                    key,
-                                    mediaItems.length,
-                                    1
-                                  )
-                                }
-                                aria-label="Next media"
-                              >
-                                &gt;
-                              </button>
-                            ) : (
-                              <span className="service-carousel__spacer"></span>
-                            )}
-                          </div>
-                        )}
+                          )
+                        })}
                       </div>
                     )
                   })()}
@@ -1349,11 +1278,17 @@ export default function App() {
                     </div>
                   )}
                 </div>
-              </details>
+              </div>
             )
-          )}
+          })}
         </div>
-      )}
+      </div>
+    )
+  }
+
+  const renderPortalContent = (portal, portalIndex) => (
+    <>
+      {isServicesPortal(portal, portalIndex) && renderServiceList(portal)}
       {isSuccessKitPortal(portal) && (
         <div className="kit-sections">
           {SUCCESS_KIT_SECTIONS.map((section) => {
@@ -2919,136 +2854,149 @@ export default function App() {
   }
 
   return (
-    <div className="page mx-auto max-w-3xl px-5 pb-10 pt-9 sm:px-6 sm:pb-16 sm:pt-12">
+      <div className="page mx-auto max-w-3xl px-5 pb-10 pt-9 sm:px-6 sm:pb-16 sm:pt-12">
       {!routePortal && (
-        <header className="hero-card">
-        <div className="hero-card__inner flex flex-col items-center text-center">
-          <p className="hero-card__eyebrow">{site.hero_eyebrow}</p>
-          <div className="mt-4">
-            {getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url)) ? (
-              <div
-                className="hero-video media-protect"
-                onContextMenu={preventContextMenu}
-                onCopy={preventCopy}
-                onCut={preventCopy}
-              >
-                  <iframe
-                    src={getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url))}
-                    title="VAKES World"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    onClick={() => openMediaViewer(resolveHeroMediaUrl(site.logo_url))}
-                  ></iframe>
-                </div>
-              ) : isVideoUrl(resolveHeroMediaUrl(site.logo_url)) ? (
-                <video
-                  className="hero-logo h-auto w-[220px] max-w-full"
-                src={resolveHeroMediaUrl(site.logo_url)}
-                autoPlay
-                loop
-                muted
-                playsInline
-                controlsList="nodownload noplaybackrate noremoteplayback"
-                disablePictureInPicture
-                disableRemotePlayback
-                  onContextMenu={preventContextMenu}
-                  onCopy={preventCopy}
-                  onCut={preventCopy}
-                  onClick={() => openMediaViewer(resolveHeroMediaUrl(site.logo_url))}
-                />
-              ) : (
-                <div className="media-protect media-protect--overlay">
-                  <img
-                    src={resolveHeroMediaUrl(site.logo_url)}
-                  alt="VAKES World"
-                  className="hero-logo h-auto w-[220px] max-w-full"
-                  onContextMenu={preventContextMenu}
-                    onDragStart={preventDragStart}
+        <div className="hero-wrap">
+          <header className="hero-card">
+            <div className="hero-card__inner flex flex-col items-center text-center">
+              <p className="hero-card__eyebrow">{site.hero_eyebrow}</p>
+              <div className="mt-4">
+                {getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url)) ? (
+                  <div
+                    className="hero-video media-protect"
+                    onContextMenu={preventContextMenu}
                     onCopy={preventCopy}
                     onCut={preventCopy}
-                    draggable={false}
-                    onClick={() => openMediaViewer(resolveHeroMediaUrl(site.logo_url))}
+                  >
+                    <iframe
+                      src={getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url))}
+                      title="VAKES World"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      onClick={() =>
+                        openMediaViewer(resolveHeroMediaUrl(site.logo_url))
+                      }
+                    ></iframe>
+                  </div>
+                ) : isVideoUrl(resolveHeroMediaUrl(site.logo_url)) ? (
+                  <video
+                    className="hero-logo h-auto w-[220px] max-w-full"
+                    src={resolveHeroMediaUrl(site.logo_url)}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    controlsList="nodownload noplaybackrate noremoteplayback"
+                    disablePictureInPicture
+                    disableRemotePlayback
+                    onContextMenu={preventContextMenu}
+                    onCopy={preventCopy}
+                    onCut={preventCopy}
+                    onClick={() =>
+                      openMediaViewer(resolveHeroMediaUrl(site.logo_url))
+                    }
                   />
-                </div>
-              )}
-          </div>
-          <p className="hero-card__tagline">{site.hero_tagline}</p>
-          <p className="hero-card__subline">{site.hero_subline}</p>
-          <div className="hero-socials" aria-label="Social links">
-            <a
-              className="hero-socials__link"
-              href={site.instagram_url || '#'}
-              aria-label="Instagram"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                role="img"
-                aria-hidden="true"
-                className="hero-socials__icon"
+                ) : (
+                  <div className="media-protect media-protect--overlay">
+                    <img
+                      src={resolveHeroMediaUrl(site.logo_url)}
+                      alt="VAKES World"
+                      className="hero-logo h-auto w-[220px] max-w-full"
+                      onContextMenu={preventContextMenu}
+                      onDragStart={preventDragStart}
+                      onCopy={preventCopy}
+                      onCut={preventCopy}
+                      draggable={false}
+                      onClick={() =>
+                        openMediaViewer(resolveHeroMediaUrl(site.logo_url))
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+              <p className="hero-card__tagline">{site.hero_tagline}</p>
+              <p className="hero-card__subline">{site.hero_subline}</p>
+              <div className="hero-socials" aria-label="Social links">
+                <a
+                  className="hero-socials__link"
+                  href={site.instagram_url || '#'}
+                  aria-label="Instagram"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    role="img"
+                    aria-hidden="true"
+                    className="hero-socials__icon"
+                  >
+                    <path d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H7zm5 3.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6zm0 1.8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm4.6-.7a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z" />
+                  </svg>
+                </a>
+                <a
+                  className="hero-socials__link"
+                  href={site.tiktok_url || '#'}
+                  aria-label="TikTok"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    role="img"
+                    aria-hidden="true"
+                    className="hero-socials__icon"
+                  >
+                    <path d="M14 3a6.2 6.2 0 0 0 4.4 1.8V7a7.9 7.9 0 0 1-4.4-1.4v7.2a5.8 5.8 0 1 1-5-5.7v2.3a3.5 3.5 0 1 0 2.7 3.4V3h2.3z" />
+                  </svg>
+                </a>
+                <a
+                  className="hero-socials__link"
+                  href={site.youtube_url || '#'}
+                  aria-label="YouTube"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    role="img"
+                    aria-hidden="true"
+                    className="hero-socials__icon"
+                  >
+                    <path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C17.9 5 12 5 12 5s-5.9 0-7.7.3a2.7 2.7 0 0 0-1.9 1.9A28.5 28.5 0 0 0 2 12a28.5 28.5 0 0 0 .4 4.8 2.7 2.7 0 0 0 1.9 1.9c1.8.3 7.7.3 7.7.3s5.9 0 7.7-.3a2.7 2.7 0 0 0 1.9-1.9A28.5 28.5 0 0 0 22 12a28.5 28.5 0 0 0-.4-4.8zM10 15.4V8.6L15.6 12 10 15.4z" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+            <div className="hero__confetti" aria-hidden="true"></div>
+          </header>
+          <div className="about-dock">
+            <div className={`about-dock__button${aboutExpanded ? ' is-open' : ''}`}>
+              <button
+                type="button"
+                className="about-dock__toggle"
+                onClick={() => setAboutExpanded((prev) => !prev)}
+                aria-label={aboutExpanded ? 'Close About VAKES' : 'Open About VAKES'}
               >
-                <path d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H7zm5 3.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6zm0 1.8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm4.6-.7a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z" />
-              </svg>
-            </a>
-            <a
-              className="hero-socials__link"
-              href={site.tiktok_url || '#'}
-              aria-label="TikTok"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                role="img"
-                aria-hidden="true"
-                className="hero-socials__icon"
+                <span className="about-dock__icon-wrap" aria-hidden="true">
+                  <svg className="about-dock__icon" viewBox="0 0 36 32">
+                    <path d="M18 30 L34 2 H2 Z" />
+                  </svg>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="about-dock__label-button"
+                onClick={() => setAboutModalOpen(true)}
               >
-                <path d="M14 3a6.2 6.2 0 0 0 4.4 1.8V7a7.9 7.9 0 0 1-4.4-1.4v7.2a5.8 5.8 0 1 1-5-5.7v2.3a3.5 3.5 0 1 0 2.7 3.4V3h2.3z" />
-              </svg>
-            </a>
-            <a
-              className="hero-socials__link"
-              href={site.youtube_url || '#'}
-              aria-label="YouTube"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                role="img"
-                aria-hidden="true"
-                className="hero-socials__icon"
-              >
-                <path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C17.9 5 12 5 12 5s-5.9 0-7.7.3a2.7 2.7 0 0 0-1.9 1.9A28.5 28.5 0 0 0 2 12a28.5 28.5 0 0 0 .4 4.8 2.7 2.7 0 0 0 1.9 1.9c1.8.3 7.7.3 7.7.3s5.9 0 7.7-.3a2.7 2.7 0 0 0 1.9-1.9A28.5 28.5 0 0 0 22 12a28.5 28.5 0 0 0-.4-4.8zM10 15.4V8.6L15.6 12 10 15.4z" />
-              </svg>
-            </a>
+                About VAKES
+              </button>
+            </div>
           </div>
         </div>
-        <div className="hero__confetti" aria-hidden="true"></div>
-        </header>
       )}
 
-      <div className="about-dock">
-        <div className={`about-dock__button${aboutExpanded ? ' is-open' : ''}`}>
-          <button
-            type="button"
-            className="about-dock__toggle"
-            onClick={() => setAboutExpanded((prev) => !prev)}
-            aria-label={aboutExpanded ? 'Close About VAKES' : 'Open About VAKES'}
-          >
-            <span className="about-dock__icon-wrap" aria-hidden="true">
-              <svg className="about-dock__icon" viewBox="0 0 36 32">
-                <path d="M18 30 L34 2 H2 Z" />
-              </svg>
-            </span>
-          </button>
-          <button
-            type="button"
-            className="about-dock__label-button"
-            onClick={() => setAboutModalOpen(true)}
-          >
-            About VAKES
-          </button>
-        </div>
-      </div>
-
       {routePortal && (
-        <section className="portal-page">
+        <section
+          className={`portal-page${
+            isServicesPortal(routePortal.portal, routePortal.index)
+              ? ' portal-page--services'
+              : ''
+          }`}
+        >
           <div className="portal-page__header">
             <p className="portal-page__meta">{routePortal.portal.meta}</p>
             <h1 className="portal-page__title font-title">
@@ -3448,156 +3396,7 @@ export default function App() {
             </button>
             <p className="modal__meta">{activePortal.meta}</p>
             <h2 className="modal__title">{activePortal.title}</h2>
-            {activePortalIndex === 0 && (
-              <div className="service-list">
-                {(activePortal.services?.length
-                  ? activePortal.services
-                  : DEFAULT_PORTALS[0].services
-                ).map((service, index) => (
-                  <details className="service-item" key={`${service.title}-${index}`}>
-                    <summary className="service-summary">
-                      <span>{service.title}</span>
-                    </summary>
-                    <div className="service-body">
-                      {(() => {
-                        const mediaItems = normalizeServiceMedia(service)
-                        if (!mediaItems.length) {
-                          return null
-                        }
-                        const key = `${service.title}-${index}`
-                        const currentIndex = serviceCarouselIndex[key] ?? 0
-                        const currentItem = mediaItems[currentIndex]
-                        const youtubeUrl = getYouTubeEmbedUrl(currentItem)
-                        return (
-                          <div className="service-carousel">
-                            <div
-                              className="service-carousel__viewport media-protect"
-                              onPointerDown={(event) =>
-                                handleServiceCarouselPointerDown(key, event)
-                              }
-                              onPointerUp={(event) =>
-                                handleServiceCarouselPointerUp(
-                                  key,
-                                  mediaItems.length,
-                                  event
-                                )
-                              }
-                              onPointerCancel={(event) =>
-                                handleServiceCarouselPointerCancel(key, event)
-                              }
-                              onContextMenu={preventContextMenu}
-                              onCopy={preventCopy}
-                              onCut={preventCopy}
-                            >
-                              <div className="service-carousel__item">
-                                {!currentItem ? (
-                                  <div className="service-carousel__placeholder">
-                                    Media unavailable
-                                  </div>
-                                ) : youtubeUrl ? (
-                                  <iframe
-                                    src={youtubeUrl}
-                                    title={service.title}
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowFullScreen
-                                  ></iframe>
-                                ) : isVideoUrl(currentItem) ? (
-                                  <video
-                                    src={currentItem}
-                                    autoPlay
-                                    loop
-                                    muted
-                                    playsInline
-                                    controls
-                                    controlsList="nodownload noplaybackrate noremoteplayback"
-                                    disablePictureInPicture
-                                    disableRemotePlayback
-                                    onContextMenu={preventContextMenu}
-                                    onCopy={preventCopy}
-                                    onCut={preventCopy}
-                                  />
-                                ) : (
-                                  <img
-                                    src={currentItem}
-                                    alt={service.title}
-                                    onContextMenu={preventContextMenu}
-                                    onDragStart={preventDragStart}
-                                    onCopy={preventCopy}
-                                    onCut={preventCopy}
-                                    draggable={false}
-                                  />
-                                )}
-                              </div>
-                            </div>
-                            {mediaItems.length > 1 && (
-                              <div className="service-carousel__controls">
-                                {currentIndex > 0 ? (
-                                  <button
-                                    type="button"
-                                    className="service-carousel__nav"
-                                    onClick={() =>
-                                      handleServiceCarouselStep(
-                                        key,
-                                        mediaItems.length,
-                                        -1
-                                      )
-                                    }
-                                    aria-label="Previous media"
-                                  >
-                                    &lt;
-                                  </button>
-                                ) : (
-                                  <span className="service-carousel__spacer"></span>
-                                )}
-                                <div className="service-carousel__count">
-                                  {currentIndex + 1} / {mediaItems.length}
-                                </div>
-                                {currentIndex < mediaItems.length - 1 ? (
-                                  <button
-                                    type="button"
-                                    className="service-carousel__nav"
-                                    onClick={() =>
-                                      handleServiceCarouselStep(
-                                        key,
-                                        mediaItems.length,
-                                        1
-                                      )
-                                    }
-                                    aria-label="Next media"
-                                  >
-                                    &gt;
-                                  </button>
-                                ) : (
-                                  <span className="service-carousel__spacer"></span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })()}
-                      {(service.description || portals.some(isWorkWithMePortal)) && (
-                        <div className="service-description-row">
-                          {service.description && (
-                            <p className="service-description">
-                              {service.description}
-                            </p>
-                          )}
-                          {portals.some(isWorkWithMePortal) && (
-                            <button
-                              type="button"
-                              className="service-cta"
-                              onClick={handleStartProjectClick}
-                            >
-                              Start a project
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </details>
-                ))}
-              </div>
-            )}
+            {activePortalIndex === 0 && renderServiceList(activePortal)}
             {isSuccessKitPortal(activePortal) && (
               <div className="kit-sections">
                 {SUCCESS_KIT_SECTIONS.map((section) => {
