@@ -1,6 +1,6 @@
 export const DEFAULT_ABOUT = {
   image_url: '',
-  bio: 'VAKES World is a creative studio blending art, technology, and culture.',
+  bio: 'VAKES is a creative studio blending art, technology, and culture.',
   team: ['Creative Director', 'Design Lead', 'Engineering'],
   partners: ['Collaborators', 'Studios', 'Brands'],
   blog_links: [],
@@ -17,7 +17,7 @@ export const DEFAULT_SITE = {
   instagram_url: 'https://www.instagram.com/vakesworld',
   tiktok_url: 'https://www.tiktok.com/@vakesworld',
   youtube_url: 'https://www.youtube.com/@vakesworld',
-  footer_text: '(c) VAKES World',
+  footer_text: '(c) VAKES',
   about_section: DEFAULT_ABOUT,
 }
 

@@ -2870,7 +2870,7 @@ export default function App() {
                   >
                     <iframe
                       src={getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url))}
-                      title="VAKES World"
+                      title="VAKES"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
                       onClick={() =>
@@ -2900,7 +2900,7 @@ export default function App() {
                   <div className="media-protect media-protect--overlay">
                     <img
                       src={resolveHeroMediaUrl(site.logo_url)}
-                      alt="VAKES World"
+                  alt="VAKES"
                       className="hero-logo h-auto w-[220px] max-w-full"
                       onContextMenu={preventContextMenu}
                       onDragStart={preventDragStart}
@@ -3075,7 +3075,7 @@ export default function App() {
               Close
             </button>
             <p className="modal__meta">About</p>
-            <h2 className="modal__title">VAKES World</h2>
+            <h2 className="modal__title">VAKES</h2>
             <div className="about-modal__content">
               {getAboutSection(site).image_url ? (
                 <div className="about-modal__media media-protect media-protect--overlay">
