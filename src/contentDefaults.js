@@ -8,6 +8,98 @@ export const DEFAULT_ABOUT = {
   phone: '+234 000 000 0000',
 }
 
+export const DEFAULT_PORTFOLIO = {
+  name: 'Victor M Fabian',
+  title: 'Data Analyst & Digital Technologist',
+  location: 'Remote / Global',
+  summary:
+    'I translate complex data into clear strategy, dashboards, and digital products that ship.',
+  availability: 'Available for select collaborations',
+  image_url: '',
+  socials: {
+    linkedin: '',
+    github: '',
+    twitter: '',
+    website: '',
+  },
+  cv_url: '',
+  focus: [
+    'Product analytics and KPI design',
+    'Business intelligence dashboards',
+    'Automation and data ops',
+    'Digital systems and web experiences',
+  ],
+  highlights: [
+    { label: 'Projects shipped', value: '40+', icon_url: '' },
+    { label: 'Industries', value: 'Tech, Retail, Creative', icon_url: '' },
+    { label: 'Tools', value: 'SQL, Python, Power BI', icon_url: '' },
+    { label: 'Clients', value: 'Founders & teams', icon_url: '' },
+  ],
+  skills: [
+    'Data modeling',
+    'SQL + Postgres',
+    'Python analytics',
+    'Power BI + Looker',
+    'A/B testing',
+    'Funnel analysis',
+    'Automation',
+    'Dashboard UX',
+  ],
+  tools: [
+    'SQL',
+    'Python',
+    'Power BI',
+    'Looker Studio',
+    'Supabase',
+    'Figma',
+    'Google Analytics',
+    'Notion',
+  ],
+  projects: [
+    {
+      title: 'Growth Control Room',
+      description:
+        'Built a KPI cockpit for a DTC brand, unifying sales, ads, and retention.',
+      impact: 'Reduced reporting time from 6 hours to 30 minutes.',
+      stack: 'SQL, Power BI, GA4',
+      media_url: '',
+      media_type: 'image',
+    },
+    {
+      title: 'Revenue Forecast Engine',
+      description:
+        'Created a forecasting model with scenario sliders for finance and ops.',
+      impact: 'Improved cash planning confidence and weekly alignment.',
+      stack: 'Python, Sheets, Looker Studio',
+      media_url: '',
+      media_type: 'image',
+    },
+    {
+      title: 'Creator Analytics Suite',
+      description:
+        'Designed a creator dashboard tracking content ROI and audience growth.',
+      impact: 'Enabled data-backed programming and sponsorship pricing.',
+      stack: 'Supabase, SQL, Figma',
+      media_url: '',
+      media_type: 'image',
+    },
+  ],
+  experience: [
+    {
+      role: 'Data Analyst / Digital Technologist',
+      scope: 'BI systems, product analytics, automation',
+    },
+    {
+      role: 'Creative Technologist',
+      scope: 'Data storytelling, brand intelligence, web systems',
+    },
+  ],
+  contact: {
+    email: 'hello@vakes.world',
+    cta: 'Let us build your data engine.',
+  },
+}
+
 export const DEFAULT_SITE = {
   id: 1,
   hero_eyebrow: 'Curated Creative Universe',
@@ -19,6 +111,7 @@ export const DEFAULT_SITE = {
   youtube_url: 'https://www.youtube.com/@vakesworld',
   footer_text: '(c) VAKES',
   about_section: DEFAULT_ABOUT,
+  portfolio_section: DEFAULT_PORTFOLIO,
 }
 
 export const DEFAULT_SUCCESS_KIT = {
@@ -163,5 +256,12 @@ export const DEFAULT_PORTALS = [
     href: '#',
     sort_order: 4,
     work_form: DEFAULT_WORK_WITH_ME,
+  },
+  {
+    id: 5,
+    meta: 'Portfolio',
+    title: 'Victor M Fabian',
+    href: '#',
+    sort_order: 5,
   },
 ]

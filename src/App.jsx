@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   DEFAULT_ABOUT,
   DEFAULT_PORTALS,
+  DEFAULT_PORTFOLIO,
   DEFAULT_SITE,
   DEFAULT_SUCCESS_KIT,
   DEFAULT_SHOP,
@@ -45,6 +46,7 @@ export default function App() {
           youtube_url: '',
           footer_text: '',
           about_section: DEFAULT_ABOUT,
+          portfolio_section: DEFAULT_PORTFOLIO,
         }
   )
   const [portals, setPortals] = useState(
@@ -60,12 +62,16 @@ export default function App() {
   const [session, setSession] = useState(null)
   const [authEmail, setAuthEmail] = useState('')
   const [authPassword, setAuthPassword] = useState('')
+  const [shopAuthMode, setShopAuthMode] = useState('sign-in')
+  const [shopAuthEmail, setShopAuthEmail] = useState('')
+  const [shopAuthPassword, setShopAuthPassword] = useState('')
+  const [shopAuthStatus, setShopAuthStatus] = useState('')
+  const [shopAuthError, setShopAuthError] = useState('')
+  const [shopAuthLoading, setShopAuthLoading] = useState(false)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [hasLoadedContent, setHasLoadedContent] = useState(false)
-  const [activePortal, setActivePortal] = useState(null)
-  const [activePortalIndex, setActivePortalIndex] = useState(null)
   const [activeShopTab, setActiveShopTab] = useState('all')
   const [activeShopItem, setActiveShopItem] = useState(null)
   const [activeShopSize, setActiveShopSize] = useState('')
@@ -107,6 +113,9 @@ export default function App() {
   const [workFormError, setWorkFormError] = useState('')
   const [workFormStatus, setWorkFormStatus] = useState('')
   const [workFormFieldErrors, setWorkFormFieldErrors] = useState({})
+  const [workFormContext, setWorkFormContext] = useState('portal')
+  const [portfolioCallOpen, setPortfolioCallOpen] = useState(false)
+  const [resumeOpen, setResumeOpen] = useState(false)
   const [activeNavCardIndex, setActiveNavCardIndex] = useState(0)
   const [currentTime, setCurrentTime] = useState(
     new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
@@ -137,6 +146,12 @@ export default function App() {
     const meta = portal?.meta?.toLowerCase() || ''
     const title = portal?.title?.toLowerCase() || ''
     return meta.includes('work with') || title.includes('start a project')
+  }
+
+  const isPortfolioPortal = (portal) => {
+    const meta = portal?.meta?.toLowerCase() || ''
+    const title = portal?.title?.toLowerCase() || ''
+    return meta.includes('portfolio') || title.includes('victor')
   }
 
   const slugify = (value) =>
@@ -193,6 +208,8 @@ export default function App() {
           slug = 'products'
         } else if (slug.includes('success')) {
           slug = 'success-kit'
+        } else if (isPortfolioPortal(portal)) {
+          slug = 'victormfabian'
         } else if (!slug) {
           slug = `portal-${index + 1}`
         }
@@ -200,11 +217,16 @@ export default function App() {
       }),
     [portals]
   )
+  const hasPortfolioPortal = portalRoutes.some(
+    (item) => item.slug === 'victormfabian'
+  )
 
   const routeSlug = location.pathname.replace(/^\/+|\/+$/g, '')
   const routePortal = portalRoutes.find((item) => item.slug === routeSlug) || null
-  const activeContentPortal = routePortal?.portal || activePortal
-  const activeContentIndex = routePortal?.index ?? activePortalIndex
+  const activeContentPortal = routePortal?.portal || null
+  const isPortfolioRoute = routeSlug === 'victormfabian'
+  const isPortfolioView =
+    isPortfolioRoute || (routePortal && isPortfolioPortal(routePortal.portal))
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -350,6 +372,93 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    const userEmail = session?.user?.email
+    if (!userEmail) {
+      return
+    }
+
+    setCheckoutForm((prevForm) =>
+      prevForm.email ? prevForm : { ...prevForm, email: userEmail }
+    )
+    setShopAuthEmail((prevEmail) => prevEmail || userEmail)
+  }, [session])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return
+    }
+
+    const setMeta = (name, content) => {
+      if (!content) {
+        return
+      }
+      let tag = document.querySelector(`meta[name="${name}"]`)
+      if (!tag) {
+        tag = document.createElement('meta')
+        tag.setAttribute('name', name)
+        document.head.appendChild(tag)
+      }
+      tag.setAttribute('content', content)
+    }
+
+    const setMetaProperty = (property, content) => {
+      if (!content) {
+        return
+      }
+      let tag = document.querySelector(`meta[property="${property}"]`)
+      if (!tag) {
+        tag = document.createElement('meta')
+        tag.setAttribute('property', property)
+        document.head.appendChild(tag)
+      }
+      tag.setAttribute('content', content)
+    }
+
+    const setCanonical = (href) => {
+      if (!href) {
+        return
+      }
+      let link = document.querySelector('link[rel="canonical"]')
+      if (!link) {
+        link = document.createElement('link')
+        link.setAttribute('rel', 'canonical')
+        document.head.appendChild(link)
+      }
+      link.setAttribute('href', href)
+    }
+
+    const portfolioProfile = getPortfolioSection(site)
+    const pageLabel =
+      routePortal?.portal?.meta ||
+      routePortal?.portal?.title ||
+      (isPortfolioRoute ? portfolioProfile.name : '')
+    const siteName = 'VAKES'
+    const heroLine =
+      site?.hero_tagline || site?.hero_subline || 'Creative systems and culture.'
+    const pageTitle = pageLabel ? `${pageLabel} | ${siteName}` : siteName
+    const portfolioDescription = `${portfolioProfile.title}. ${portfolioProfile.summary}`
+    const pageDescription = pageLabel
+      ? [
+          routePortal?.portal?.title,
+          isPortfolioRoute ? portfolioDescription : heroLine,
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : [site?.hero_tagline, site?.hero_subline].filter(Boolean).join(' ')
+
+    const pageUrl = `${window.location.origin}${location.pathname || '/'}`
+
+    document.title = pageTitle
+    setMeta('description', pageDescription)
+    setMetaProperty('og:title', pageTitle)
+    setMetaProperty('og:description', pageDescription)
+    setMetaProperty('og:url', pageUrl)
+    setMetaProperty('twitter:title', pageTitle)
+    setMetaProperty('twitter:description', pageDescription)
+    setCanonical(pageUrl)
+  }, [location.pathname, routePortal, site])
+
+  useEffect(() => {
     if (isAdminView) {
       return
     }
@@ -373,22 +482,6 @@ export default function App() {
       observer.disconnect()
     }
   }, [isAdminView, portals])
-
-  useEffect(() => {
-    if (!activePortal) {
-      return
-    }
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        setActivePortal(null)
-        setActivePortalIndex(null)
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activePortal])
 
   useEffect(() => {
     if (activeContentPortal && isShopPortal(activeContentPortal)) {
@@ -465,8 +558,6 @@ export default function App() {
   }, [location.pathname])
 
   useEffect(() => {
-    setActivePortal(null)
-    setActivePortalIndex(null)
     setActiveShopItem(null)
   }, [location.pathname])
 
@@ -577,6 +668,33 @@ export default function App() {
       ? { ...DEFAULT_ABOUT, ...siteData.about_section }
       : DEFAULT_ABOUT
 
+  const getPortfolioSection = (siteData) => {
+    const section = siteData?.portfolio_section
+      ? { ...DEFAULT_PORTFOLIO, ...siteData.portfolio_section }
+      : DEFAULT_PORTFOLIO
+    return {
+      ...section,
+      socials: section.socials
+        ? { ...DEFAULT_PORTFOLIO.socials, ...section.socials }
+        : DEFAULT_PORTFOLIO.socials,
+      focus: section.focus?.length ? section.focus : DEFAULT_PORTFOLIO.focus,
+      highlights: section.highlights?.length
+        ? section.highlights
+        : DEFAULT_PORTFOLIO.highlights,
+      skills: section.skills?.length ? section.skills : DEFAULT_PORTFOLIO.skills,
+      tools: section.tools?.length ? section.tools : DEFAULT_PORTFOLIO.tools,
+      projects: section.projects?.length
+        ? section.projects
+        : DEFAULT_PORTFOLIO.projects,
+      experience: section.experience?.length
+        ? section.experience
+        : DEFAULT_PORTFOLIO.experience,
+      contact: section.contact
+        ? { ...DEFAULT_PORTFOLIO.contact, ...section.contact }
+        : DEFAULT_PORTFOLIO.contact,
+    }
+  }
+
 
   const normalizeServiceMedia = (service) => {
     const media = Array.isArray(service.media)
@@ -646,11 +764,60 @@ export default function App() {
     setLoading(false)
   }
 
+  const handleShopAuthSubmit = async (event) => {
+    event.preventDefault()
+    if (!supabase) {
+      setShopAuthError('Sign in is unavailable right now.')
+      return
+    }
+
+    if (!shopAuthEmail.trim() || !shopAuthPassword.trim()) {
+      setShopAuthError('Enter an email and password.')
+      return
+    }
+
+    setShopAuthLoading(true)
+    setShopAuthError('')
+    setShopAuthStatus('')
+
+    const payload = {
+      email: shopAuthEmail.trim(),
+      password: shopAuthPassword,
+    }
+    const authResponse =
+      shopAuthMode === 'sign-up'
+        ? await supabase.auth.signUp(payload)
+        : await supabase.auth.signInWithPassword(payload)
+
+    if (authResponse.error) {
+      setShopAuthError(authResponse.error.message)
+      setShopAuthLoading(false)
+      return
+    }
+
+    if (shopAuthMode === 'sign-up' && !authResponse.data.session) {
+      setShopAuthStatus('Check your email to confirm your account.')
+    } else {
+      setShopAuthStatus('Signed in.')
+    }
+
+    setShopAuthPassword('')
+    setShopAuthLoading(false)
+  }
+
   const handleSignOut = async () => {
     if (!supabase) {
       return
     }
     await supabase.auth.signOut()
+  }
+
+  const handleShopSignOut = async () => {
+    if (!supabase) {
+      return
+    }
+    await supabase.auth.signOut()
+    setShopAuthStatus('Signed out.')
   }
 
   const handleSaveAll = async () => {
@@ -691,6 +858,7 @@ export default function App() {
       youtube_url: draftSite.youtube_url,
       footer_text: draftSite.footer_text,
       about_section: draftSite.about_section || DEFAULT_ABOUT,
+      portfolio_section: draftSite.portfolio_section || DEFAULT_PORTFOLIO,
     }
 
     const { error: siteError } = await supabase
@@ -771,12 +939,6 @@ export default function App() {
     setDraftPortals(nextPortals)
   }
 
-  const handlePortalClick = (portal, index, event) => {
-    event.preventDefault()
-    setActivePortal(portal)
-    setActivePortalIndex(index)
-  }
-
   const handleServiceChange = (portalIndex, serviceIndex, field, value) => {
     const nextPortals = [...draftPortals]
     const portal = nextPortals[portalIndex]
@@ -844,6 +1006,104 @@ export default function App() {
     services[serviceIndex] = { ...service, media }
     nextPortals[portalIndex] = { ...portal, services }
     setDraftPortals(nextPortals)
+  }
+
+  const updatePortfolioSection = (nextSection) => {
+    setDraftSite({
+      ...draftSite,
+      portfolio_section: { ...getPortfolioSection(draftSite), ...nextSection },
+    })
+  }
+
+  const updatePortfolioContact = (field, value) => {
+    const current = getPortfolioSection(draftSite)
+    updatePortfolioSection({
+      contact: { ...current.contact, [field]: value },
+    })
+  }
+
+  const updatePortfolioSocial = (field, value) => {
+    const current = getPortfolioSection(draftSite)
+    updatePortfolioSection({
+      socials: { ...current.socials, [field]: value },
+    })
+  }
+
+  const updatePortfolioList = (field, value) => {
+    updatePortfolioSection({ [field]: value })
+  }
+
+  const handlePortfolioHighlightChange = (index, field, value) => {
+    const current = getPortfolioSection(draftSite)
+    const highlights = [...current.highlights]
+    highlights[index] = { ...highlights[index], [field]: value }
+    updatePortfolioSection({ highlights })
+  }
+
+  const handleAddPortfolioHighlight = () => {
+    const current = getPortfolioSection(draftSite)
+    updatePortfolioSection({
+      highlights: [...current.highlights, { label: '', value: '' }],
+    })
+  }
+
+  const handleRemovePortfolioHighlight = (index) => {
+    const current = getPortfolioSection(draftSite)
+    const highlights = [...current.highlights]
+    highlights.splice(index, 1)
+    updatePortfolioSection({ highlights })
+  }
+
+  const handlePortfolioProjectChange = (index, field, value) => {
+    const current = getPortfolioSection(draftSite)
+    const projects = [...current.projects]
+    projects[index] = { ...projects[index], [field]: value }
+    updatePortfolioSection({ projects })
+  }
+
+  const handleAddPortfolioProject = () => {
+    const current = getPortfolioSection(draftSite)
+    updatePortfolioSection({
+      projects: [
+        ...current.projects,
+        {
+          title: '',
+          description: '',
+          impact: '',
+          stack: '',
+          media_url: '',
+          media_type: 'image',
+        },
+      ],
+    })
+  }
+
+  const handleRemovePortfolioProject = (index) => {
+    const current = getPortfolioSection(draftSite)
+    const projects = [...current.projects]
+    projects.splice(index, 1)
+    updatePortfolioSection({ projects })
+  }
+
+  const handlePortfolioExperienceChange = (index, field, value) => {
+    const current = getPortfolioSection(draftSite)
+    const experience = [...current.experience]
+    experience[index] = { ...experience[index], [field]: value }
+    updatePortfolioSection({ experience })
+  }
+
+  const handleAddPortfolioExperience = () => {
+    const current = getPortfolioSection(draftSite)
+    updatePortfolioSection({
+      experience: [...current.experience, { role: '', scope: '' }],
+    })
+  }
+
+  const handleRemovePortfolioExperience = (index) => {
+    const current = getPortfolioSection(draftSite)
+    const experience = [...current.experience]
+    experience.splice(index, 1)
+    updatePortfolioSection({ experience })
   }
 
   const preventContextMenu = (event) => {
@@ -1049,6 +1309,11 @@ export default function App() {
       return
     }
 
+    if (!session?.user) {
+      setCheckoutError('Sign in to checkout.')
+      return
+    }
+
     const hasAllFields =
       checkoutForm.fullName.trim() &&
       checkoutForm.address.trim() &&
@@ -1108,7 +1373,9 @@ export default function App() {
 
   const handleWorkFormSubmit = async () => {
     const fieldErrors = {}
-    if (!workForm.service) fieldErrors.service = true
+    if (workFormContext !== 'portfolio' && !workForm.service) {
+      fieldErrors.service = true
+    }
     if (!workForm.name.trim()) fieldErrors.name = true
     if (!workForm.industry) fieldErrors.industry = true
     if (!workForm.email.trim()) fieldErrors.email = true
@@ -1126,7 +1393,7 @@ export default function App() {
     }
 
     const hasRequired =
-      workForm.service &&
+      (workFormContext === 'portfolio' || workForm.service) &&
       workForm.name.trim() &&
       workForm.industry &&
       workForm.email.trim() &&
@@ -1148,7 +1415,8 @@ export default function App() {
     setWorkFormStatus('Submitting...')
 
     const { error: insertError } = await supabase.from('work_requests').insert({
-      service: workForm.service,
+      service:
+        workFormContext === 'portfolio' ? 'Portfolio Call' : workForm.service,
       name: workForm.name,
       industry: workForm.industry,
       other: workForm.other,
@@ -1286,9 +1554,397 @@ export default function App() {
     )
   }
 
+  const renderShopAuthSection = () => (
+    <div className="shop-auth">
+      {!isSupabaseConfigured ? (
+        <p className="shop-auth__note">Accounts are unavailable right now.</p>
+      ) : session?.user ? (
+        <div className="shop-auth__signed">
+          <div>
+            <div className="shop-auth__title">Account</div>
+            <div className="shop-auth__user">{session.user.email}</div>
+          </div>
+          <button
+            type="button"
+            className="shop-auth__button"
+            onClick={handleShopSignOut}
+          >
+            Sign out
+          </button>
+        </div>
+      ) : (
+        <form className="shop-auth__form" onSubmit={handleShopAuthSubmit}>
+          <div className="shop-auth__header">
+            <div className="shop-auth__title">Shop account</div>
+            <div className="shop-auth__toggle">
+              <button
+                type="button"
+                className={`shop-auth__toggle-btn${
+                  shopAuthMode === 'sign-in' ? ' is-active' : ''
+                }`}
+                onClick={() => {
+                  setShopAuthMode('sign-in')
+                  setShopAuthError('')
+                  setShopAuthStatus('')
+                }}
+              >
+                Sign in
+              </button>
+              <button
+                type="button"
+                className={`shop-auth__toggle-btn${
+                  shopAuthMode === 'sign-up' ? ' is-active' : ''
+                }`}
+                onClick={() => {
+                  setShopAuthMode('sign-up')
+                  setShopAuthError('')
+                  setShopAuthStatus('')
+                }}
+              >
+                Sign up
+              </button>
+            </div>
+          </div>
+          <div className="shop-auth__fields">
+            <label className="shop-auth__label">
+              Email
+              <input
+                className="shop-auth__input"
+                type="email"
+                value={shopAuthEmail}
+                onChange={(event) => setShopAuthEmail(event.target.value)}
+                required
+                disabled={shopAuthLoading}
+              />
+            </label>
+            <label className="shop-auth__label">
+              Password
+              <input
+                className="shop-auth__input"
+                type="password"
+                value={shopAuthPassword}
+                onChange={(event) => setShopAuthPassword(event.target.value)}
+                minLength={6}
+                required
+                disabled={shopAuthLoading}
+              />
+            </label>
+          </div>
+          {shopAuthError && <p className="shop-auth__error">{shopAuthError}</p>}
+          {shopAuthStatus && <p className="shop-auth__status">{shopAuthStatus}</p>}
+          <button
+            className="shop-auth__button"
+            type="submit"
+            disabled={shopAuthLoading}
+          >
+            {shopAuthMode === 'sign-up' ? 'Create account' : 'Sign in'}
+          </button>
+        </form>
+      )}
+    </div>
+  )
+
+  const renderPortfolioContent = () => {
+    const profile = getPortfolioSection(site)
+    return (
+      <div className="portfolio">
+        <div className="portfolio-mobile">
+          <div className="portfolio-mobile__header">
+            {profile.image_url ? (
+              <div className="portfolio-mobile__avatar">
+                <img src={profile.image_url} alt={profile.name} />
+              </div>
+            ) : null}
+            <div>
+              <p className="portfolio-mobile__name">{profile.name}</p>
+              <p className="portfolio-mobile__title">{profile.title}</p>
+            </div>
+          </div>
+          <p className="portfolio-mobile__summary">{profile.summary}</p>
+          <div className="portfolio-mobile__meta">
+            <span>{profile.location}</span>
+            <span>{profile.availability}</span>
+          </div>
+          <div className="portfolio-mobile__socials">
+            {profile.socials.linkedin ? (
+              <a href={profile.socials.linkedin} target="_blank" rel="noreferrer">
+                <svg className="portfolio-social__icon" viewBox="0 0 24 24">
+                  <path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zm-2 7h4v10h-4v-10zm7 0h3.8v1.4h.1c.5-.9 1.8-1.9 3.8-1.9 4.1 0 4.8 2.7 4.8 6.2v6.3h-4v-5.6c0-1.3 0-3-1.8-3s-2.1 1.4-2.1 2.9v5.7h-4v-10z" />
+                </svg>
+                LinkedIn
+              </a>
+            ) : null}
+            {profile.socials.github ? (
+              <a href={profile.socials.github} target="_blank" rel="noreferrer">
+                <svg className="portfolio-social__icon" viewBox="0 0 24 24">
+                  <path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.2-3.4-1.2-.5-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 3 .9.1-.7.4-1.1.7-1.4-2.2-.2-4.6-1.1-4.6-5a3.9 3.9 0 0 1 1-2.7c-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.5 9.5 0 0 1 5 0c2-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7a3.9 3.9 0 0 1 1 2.7c0 3.9-2.4 4.8-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10 10 0 0 0 12 2z" />
+                </svg>
+                GitHub
+              </a>
+            ) : null}
+            {profile.socials.twitter ? (
+              <a href={profile.socials.twitter} target="_blank" rel="noreferrer">
+                <svg className="portfolio-social__icon" viewBox="0 0 24 24">
+                  <path d="M18.3 3H21l-6.1 7 7.2 11h-5.6l-4.4-6.4-5.5 6.4H3.9l6.6-7.7L3.5 3h5.7l4 5.9L18.3 3zm-1 16h1.6L8.7 5h-1.7L17.3 19z" />
+                </svg>
+                X/Twitter
+              </a>
+            ) : null}
+            {profile.socials.website ? (
+              <a href={profile.socials.website} target="_blank" rel="noreferrer">
+                <svg className="portfolio-social__icon" viewBox="0 0 24 24">
+                  <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm6.9 9h-2.7a15.5 15.5 0 0 0-1.4-5 8.1 8.1 0 0 1 4.1 5zm-6.9-7.1c1 1.4 1.8 3.3 2.2 5.1H9.8c.4-1.8 1.2-3.7 2.2-5.1zM4.9 13h2.7c.3 1.9.9 3.6 1.4 5a8.1 8.1 0 0 1-4.1-5zm2.7-2H4.9a8.1 8.1 0 0 1 4.1-5c-.5 1.4-1.1 3.1-1.4 5zm4.4 9.1c-1-1.4-1.8-3.3-2.2-5.1h4.4c-.4 1.8-1.2 3.7-2.2 5.1zM14.2 13H9.8c-.1-.6-.1-1.3-.1-2s0-1.4.1-2h4.4c.1.6.1 1.3.1 2s0 1.4-.1 2zm.8 5c.5-1.4 1.1-3.1 1.4-5h2.7a8.1 8.1 0 0 1-4.1 5zm1.4-7c.1-.6.1-1.3.1-2s0-1.4-.1-2h2.7a8.1 8.1 0 0 1 0 4h-2.7z" />
+                </svg>
+                Website
+              </a>
+            ) : null}
+          </div>
+          <a
+            className="portfolio-mobile__cta"
+            href="#"
+            onClick={(event) => {
+              event.preventDefault()
+              setWorkFormContext('portfolio')
+              setWorkForm((prevForm) => ({
+                ...prevForm,
+                service: 'Portfolio Call',
+              }))
+              setPortfolioCallOpen(true)
+            }}
+          >
+            Let's Work
+          </a>
+          <div className="portfolio-mobile__accordions">
+            <details className="portfolio-accordion" open>
+              <summary>Focus</summary>
+              <ul>
+                {profile.focus.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </details>
+            <details className="portfolio-accordion">
+              <summary>Highlights</summary>
+              <div className="portfolio-accordion__stats">
+                {profile.highlights.map((item) => (
+                  <div key={item.label}>
+                    <div className="portfolio-accordion__value">{item.value}</div>
+                    <div className="portfolio-accordion__label">{item.label}</div>
+                  </div>
+                ))}
+              </div>
+            </details>
+            <details className="portfolio-accordion">
+              <summary>Skills & Tools</summary>
+              <div className="portfolio-accordion__tags">
+                {[...profile.skills, ...profile.tools].map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <div className="portfolio-desktop">
+          <div className="portfolio-hero">
+            <div className="portfolio-hero__primary">
+              <div className="portfolio-hero__top">
+                {profile.image_url ? (
+                  <div className="portfolio-hero__avatar">
+                    <img src={profile.image_url} alt={profile.name} />
+                  </div>
+                ) : null}
+                <div className="portfolio-hero__identity">
+                  <p className="portfolio-hero__kicker">Profile</p>
+                  <p className="portfolio-hero__title">{profile.title}</p>
+                </div>
+              </div>
+              <p className="portfolio-hero__summary">{profile.summary}</p>
+              <div className="portfolio-hero__meta">
+                <span>{profile.location}</span>
+                <span>{profile.availability}</span>
+              </div>
+              <div className="portfolio-hero__socials">
+                {profile.socials.linkedin ? (
+                  <a href={profile.socials.linkedin} target="_blank" rel="noreferrer">
+                    <svg className="portfolio-social__icon" viewBox="0 0 24 24">
+                      <path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zm-2 7h4v10h-4v-10zm7 0h3.8v1.4h.1c.5-.9 1.8-1.9 3.8-1.9 4.1 0 4.8 2.7 4.8 6.2v6.3h-4v-5.6c0-1.3 0-3-1.8-3s-2.1 1.4-2.1 2.9v5.7h-4v-10z" />
+                    </svg>
+                    LinkedIn
+                  </a>
+                ) : null}
+                {profile.socials.github ? (
+                  <a href={profile.socials.github} target="_blank" rel="noreferrer">
+                    <svg className="portfolio-social__icon" viewBox="0 0 24 24">
+                      <path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.2-3.4-1.2-.5-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 3 .9.1-.7.4-1.1.7-1.4-2.2-.2-4.6-1.1-4.6-5a3.9 3.9 0 0 1 1-2.7c-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.5 9.5 0 0 1 5 0c2-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7a3.9 3.9 0 0 1 1 2.7c0 3.9-2.4 4.8-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10 10 0 0 0 12 2z" />
+                    </svg>
+                    GitHub
+                  </a>
+                ) : null}
+                {profile.socials.twitter ? (
+                  <a href={profile.socials.twitter} target="_blank" rel="noreferrer">
+                    <svg className="portfolio-social__icon" viewBox="0 0 24 24">
+                      <path d="M18.3 3H21l-6.1 7 7.2 11h-5.6l-4.4-6.4-5.5 6.4H3.9l6.6-7.7L3.5 3h5.7l4 5.9L18.3 3zm-1 16h1.6L8.7 5h-1.7L17.3 19z" />
+                    </svg>
+                    X/Twitter
+                  </a>
+                ) : null}
+                {profile.socials.website ? (
+                  <a href={profile.socials.website} target="_blank" rel="noreferrer">
+                    <svg className="portfolio-social__icon" viewBox="0 0 24 24">
+                      <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm6.9 9h-2.7a15.5 15.5 0 0 0-1.4-5 8.1 8.1 0 0 1 4.1 5zm-6.9-7.1c1 1.4 1.8 3.3 2.2 5.1H9.8c.4-1.8 1.2-3.7 2.2-5.1zM4.9 13h2.7c.3 1.9.9 3.6 1.4 5a8.1 8.1 0 0 1-4.1-5zm2.7-2H4.9a8.1 8.1 0 0 1 4.1-5c-.5 1.4-1.1 3.1-1.4 5zm4.4 9.1c-1-1.4-1.8-3.3-2.2-5.1h4.4c-.4 1.8-1.2 3.7-2.2 5.1zM14.2 13H9.8c-.1-.6-.1-1.3-.1-2s0-1.4.1-2h4.4c.1.6.1 1.3.1 2s0 1.4-.1 2zm.8 5c.5-1.4 1.1-3.1 1.4-5h2.7a8.1 8.1 0 0 1-4.1 5zm1.4-7c.1-.6.1-1.3.1-2s0-1.4-.1-2h2.7a8.1 8.1 0 0 1 0 4h-2.7z" />
+                    </svg>
+                    Website
+                  </a>
+                ) : null}
+              </div>
+            </div>
+            <div className="portfolio-hero__secondary">
+              <div className="portfolio-hero__focus">
+                <h3>Focus</h3>
+                <ul>
+                  {profile.focus.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="portfolio-hero__callout">
+                <p>Let us build decision systems that scale with your business.</p>
+                <a
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault()
+                    setWorkFormContext('portfolio')
+                    setWorkForm((prevForm) => ({
+                      ...prevForm,
+                      service: 'Portfolio Call',
+                    }))
+                    setPortfolioCallOpen(true)
+                  }}
+                >
+                  Let's Work
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="portfolio-highlights">
+            {profile.highlights.map((item) => (
+              <div className="portfolio-card" key={item.label}>
+                <div className="portfolio-card__icon-wrap">
+                  {item.icon_url ? (
+                    <img
+                      className="portfolio-card__icon"
+                      src={item.icon_url}
+                      alt=""
+                    />
+                  ) : null}
+                </div>
+                <div className="portfolio-card__text">
+                  <div className="portfolio-card__value">{item.value}</div>
+                  <div className="portfolio-card__label">{item.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="portfolio-grid">
+            <div className="portfolio-panel">
+              <h3>Core skills</h3>
+              <div className="portfolio-tags">
+                {profile.skills.map((skill) => (
+                  <span key={skill}>{skill}</span>
+                ))}
+              </div>
+            </div>
+            <div className="portfolio-panel">
+              <h3>Tool stack</h3>
+              <div className="portfolio-tags">
+                {profile.tools.map((tool) => (
+                  <span key={tool}>{tool}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="portfolio-projects">
+          <div className="portfolio-section__header">
+            <h3>Selected projects</h3>
+            <p>Strategy, analytics, and digital systems that move metrics.</p>
+          </div>
+          <div className="portfolio-projects__grid">
+            {profile.projects.map((project) => {
+              const mediaUrl = project.media_url || ''
+              const mediaType = project.media_type || 'image'
+              const youtubeUrl =
+                mediaType === 'youtube' ? getYouTubeEmbedUrl(mediaUrl) : ''
+              return (
+                <article className="portfolio-project" key={project.title}>
+                  {mediaUrl && (
+                    <div className="portfolio-project__media">
+                      {youtubeUrl ? (
+                        <iframe
+                          src={youtubeUrl}
+                          title={project.title}
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        ></iframe>
+                      ) : mediaType === 'video' || isVideoUrl(mediaUrl) ? (
+                        <video src={mediaUrl} controls playsInline />
+                      ) : (
+                        <img src={mediaUrl} alt={project.title} />
+                      )}
+                    </div>
+                  )}
+                  <h4>{project.title}</h4>
+                  <p>{project.description}</p>
+                  <div className="portfolio-project__impact">{project.impact}</div>
+                  <div className="portfolio-project__stack">{project.stack}</div>
+                </article>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="portfolio-experience">
+          <div className="portfolio-section__header">
+            <h3>Experience</h3>
+            <p>Hybrid roles across analytics, product, and creative technology.</p>
+          </div>
+          <div className="portfolio-experience__grid">
+            {profile.experience.map((item) => (
+              <div className="portfolio-panel" key={item.role}>
+                <h4>{item.role}</h4>
+                <p>{item.scope}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="portfolio-cta">
+          <div>
+            <h3>{profile.contact.cta}</h3>
+            <p>
+              Need dashboards, analytics, or a digital system that scales? Let us
+              talk.
+            </p>
+          </div>
+          <a
+            className="portfolio-cta__button"
+            href={`mailto:${profile.contact.email}`}
+          >
+            Contact Victor
+          </a>
+        </div>
+      </div>
+    )
+  }
+
   const renderPortalContent = (portal, portalIndex) => (
     <>
       {isServicesPortal(portal, portalIndex) && renderServiceList(portal)}
+      {isPortfolioPortal(portal) && renderPortfolioContent()}
       {isSuccessKitPortal(portal) && (
         <div className="kit-sections">
           {SUCCESS_KIT_SECTIONS.map((section) => {
@@ -1328,6 +1984,7 @@ export default function App() {
           })}
         </div>
       )}
+      {isShopPortal(portal) && renderShopAuthSection()}
       {isShopPortal(portal) && (
         <div className="shop-section">
           <div className="shop-label">Currency</div>
@@ -1414,29 +2071,31 @@ export default function App() {
       {isWorkWithMePortal(portal) && (
         <div className="work-form">
           <div className="work-form__grid">
-            <label
-              className={`work-form__label${workFormFieldErrors.service ? ' work-form__label--error' : ''}`}
-            >
-              Service
-              <select
-                className={`work-form__input${workFormFieldErrors.service ? ' work-form__input--error' : ''}`}
-                value={workForm.service}
-                onChange={(event) =>
-                  updateWorkFormField('service', event.target.value)
-                }
-                required
+            {workFormContext !== 'portfolio' && (
+              <label
+                className={`work-form__label${workFormFieldErrors.service ? ' work-form__label--error' : ''}`}
               >
-                <option value="">Select</option>
-                {getWorkFormConfig(portal).services.map((service) => (
-                  <option key={service} value={service}>
-                    {service}
-                  </option>
-                ))}
-              </select>
-              {workFormFieldErrors.service && (
-                <span className="work-form__hint">Required</span>
-              )}
-            </label>
+                Service
+                <select
+                  className={`work-form__input${workFormFieldErrors.service ? ' work-form__input--error' : ''}`}
+                  value={workForm.service}
+                  onChange={(event) =>
+                    updateWorkFormField('service', event.target.value)
+                  }
+                  required
+                >
+                  <option value="">Select</option>
+                  {getWorkFormConfig(portal).services.map((service) => (
+                    <option key={service} value={service}>
+                      {service}
+                    </option>
+                  ))}
+                </select>
+                {workFormFieldErrors.service && (
+                  <span className="work-form__hint">Required</span>
+                )}
+              </label>
+            )}
             <label
               className={`work-form__label${workFormFieldErrors.name ? ' work-form__label--error' : ''}`}
             >
@@ -2027,6 +2686,429 @@ export default function App() {
                       rows={3}
                     />
                   </label>
+                </div>
+              </div>
+              <div className="admin__section">
+                <h2 className="admin__subtitle">Portfolio</h2>
+                <div className="admin__grid">
+                  <label className="admin__label">
+                    Name
+                    <input
+                      className="admin__input"
+                      value={getPortfolioSection(draftSite).name || ''}
+                      onChange={(event) =>
+                        updatePortfolioSection({ name: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="admin__label">
+                    Title
+                    <input
+                      className="admin__input"
+                      value={getPortfolioSection(draftSite).title || ''}
+                      onChange={(event) =>
+                        updatePortfolioSection({ title: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="admin__label">
+                    Location
+                    <input
+                      className="admin__input"
+                      value={getPortfolioSection(draftSite).location || ''}
+                      onChange={(event) =>
+                        updatePortfolioSection({ location: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="admin__label">
+                    Availability
+                    <input
+                      className="admin__input"
+                      value={getPortfolioSection(draftSite).availability || ''}
+                      onChange={(event) =>
+                        updatePortfolioSection({ availability: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="admin__label">
+                    Profile Image URL
+                    <input
+                      className="admin__input"
+                      value={getPortfolioSection(draftSite).image_url || ''}
+                      onChange={(event) =>
+                        updatePortfolioSection({ image_url: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="admin__label">
+                    CV PDF URL
+                    <input
+                      className="admin__input"
+                      value={getPortfolioSection(draftSite).cv_url || ''}
+                      onChange={(event) =>
+                        updatePortfolioSection({ cv_url: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="admin__label admin__label--full">
+                    Summary
+                    <textarea
+                      className="admin__input admin__input--textarea"
+                      value={getPortfolioSection(draftSite).summary || ''}
+                      onChange={(event) =>
+                        updatePortfolioSection({ summary: event.target.value })
+                      }
+                      rows={3}
+                    />
+                  </label>
+                  <label className="admin__label">
+                    Contact Email
+                    <input
+                      className="admin__input"
+                      value={getPortfolioSection(draftSite).contact.email || ''}
+                      onChange={(event) =>
+                        updatePortfolioContact('email', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="admin__label">
+                    CTA Headline
+                    <input
+                      className="admin__input"
+                      value={getPortfolioSection(draftSite).contact.cta || ''}
+                      onChange={(event) =>
+                        updatePortfolioContact('cta', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="admin__label">
+                    LinkedIn URL
+                    <input
+                      className="admin__input"
+                      value={getPortfolioSection(draftSite).socials.linkedin || ''}
+                      onChange={(event) =>
+                        updatePortfolioSocial('linkedin', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="admin__label">
+                    GitHub URL
+                    <input
+                      className="admin__input"
+                      value={getPortfolioSection(draftSite).socials.github || ''}
+                      onChange={(event) =>
+                        updatePortfolioSocial('github', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="admin__label">
+                    X/Twitter URL
+                    <input
+                      className="admin__input"
+                      value={getPortfolioSection(draftSite).socials.twitter || ''}
+                      onChange={(event) =>
+                        updatePortfolioSocial('twitter', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="admin__label">
+                    Website URL
+                    <input
+                      className="admin__input"
+                      value={getPortfolioSection(draftSite).socials.website || ''}
+                      onChange={(event) =>
+                        updatePortfolioSocial('website', event.target.value)
+                      }
+                    />
+                  </label>
+                  <label className="admin__label admin__label--full">
+                    Focus Areas (one per line)
+                    <textarea
+                      className="admin__input admin__input--textarea"
+                      value={(getPortfolioSection(draftSite).focus || []).join('\n')}
+                      onChange={(event) =>
+                        updatePortfolioList(
+                          'focus',
+                          event.target.value
+                            .split('\n')
+                            .map((item) => item.trim())
+                            .filter(Boolean)
+                        )
+                      }
+                      rows={3}
+                    />
+                  </label>
+                  <label className="admin__label admin__label--full">
+                    Skills (one per line)
+                    <textarea
+                      className="admin__input admin__input--textarea"
+                      value={(getPortfolioSection(draftSite).skills || []).join('\n')}
+                      onChange={(event) =>
+                        updatePortfolioList(
+                          'skills',
+                          event.target.value
+                            .split('\n')
+                            .map((item) => item.trim())
+                            .filter(Boolean)
+                        )
+                      }
+                      rows={3}
+                    />
+                  </label>
+                  <label className="admin__label admin__label--full">
+                    Tools (one per line)
+                    <textarea
+                      className="admin__input admin__input--textarea"
+                      value={(getPortfolioSection(draftSite).tools || []).join('\n')}
+                      onChange={(event) =>
+                        updatePortfolioList(
+                          'tools',
+                          event.target.value
+                            .split('\n')
+                            .map((item) => item.trim())
+                            .filter(Boolean)
+                        )
+                      }
+                      rows={3}
+                    />
+                  </label>
+                </div>
+                <div className="admin__section-header">
+                  <h3 className="admin__subtitle">Highlights</h3>
+                  <button
+                    type="button"
+                    className="admin__button admin__button--ghost"
+                    onClick={handleAddPortfolioHighlight}
+                  >
+                    Add highlight
+                  </button>
+                </div>
+                <div className="admin__list">
+                  {getPortfolioSection(draftSite).highlights.map((item, index) => (
+                    <div className="admin__card" key={`portfolio-highlight-${index}`}>
+                      <div className="admin__grid">
+                        <label className="admin__label">
+                          Label
+                          <input
+                            className="admin__input"
+                            value={item.label || ''}
+                            onChange={(event) =>
+                              handlePortfolioHighlightChange(
+                                index,
+                                'label',
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+                        <label className="admin__label">
+                          Value
+                          <input
+                            className="admin__input"
+                            value={item.value || ''}
+                            onChange={(event) =>
+                              handlePortfolioHighlightChange(
+                                index,
+                                'value',
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+                        <label className="admin__label">
+                          Icon URL (SVG)
+                          <input
+                            className="admin__input"
+                            value={item.icon_url || ''}
+                            onChange={(event) =>
+                              handlePortfolioHighlightChange(
+                                index,
+                                'icon_url',
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+                      </div>
+                      <button
+                        type="button"
+                        className="admin__button admin__button--ghost"
+                        onClick={() => handleRemovePortfolioHighlight(index)}
+                      >
+                        Remove highlight
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="admin__section-header">
+                  <h3 className="admin__subtitle">Projects</h3>
+                  <button
+                    type="button"
+                    className="admin__button admin__button--ghost"
+                    onClick={handleAddPortfolioProject}
+                  >
+                    Add project
+                  </button>
+                </div>
+                <div className="admin__list">
+                  {getPortfolioSection(draftSite).projects.map((project, index) => (
+                    <div className="admin__card" key={`portfolio-project-${index}`}>
+                      <div className="admin__grid">
+                        <label className="admin__label">
+                          Title
+                          <input
+                            className="admin__input"
+                            value={project.title || ''}
+                            onChange={(event) =>
+                              handlePortfolioProjectChange(
+                                index,
+                                'title',
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+                        <label className="admin__label">
+                          Stack
+                          <input
+                            className="admin__input"
+                            value={project.stack || ''}
+                            onChange={(event) =>
+                              handlePortfolioProjectChange(
+                                index,
+                                'stack',
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+                        <label className="admin__label admin__label--full">
+                          Description
+                          <textarea
+                            className="admin__input admin__input--textarea"
+                            value={project.description || ''}
+                            onChange={(event) =>
+                              handlePortfolioProjectChange(
+                                index,
+                                'description',
+                                event.target.value
+                              )
+                            }
+                            rows={3}
+                          />
+                        </label>
+                        <label className="admin__label admin__label--full">
+                          Impact
+                          <textarea
+                            className="admin__input admin__input--textarea"
+                            value={project.impact || ''}
+                            onChange={(event) =>
+                              handlePortfolioProjectChange(
+                                index,
+                                'impact',
+                                event.target.value
+                              )
+                            }
+                            rows={2}
+                          />
+                        </label>
+                        <label className="admin__label admin__label--full">
+                          Media URL
+                          <input
+                            className="admin__input"
+                            value={project.media_url || ''}
+                            onChange={(event) =>
+                              handlePortfolioProjectChange(
+                                index,
+                                'media_url',
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+                        <label className="admin__label">
+                          Media Type
+                          <select
+                            className="admin__input"
+                            value={project.media_type || 'image'}
+                            onChange={(event) =>
+                              handlePortfolioProjectChange(
+                                index,
+                                'media_type',
+                                event.target.value
+                              )
+                            }
+                          >
+                            <option value="image">Image</option>
+                            <option value="video">Video</option>
+                            <option value="youtube">YouTube</option>
+                          </select>
+                        </label>
+                      </div>
+                      <button
+                        type="button"
+                        className="admin__button admin__button--ghost"
+                        onClick={() => handleRemovePortfolioProject(index)}
+                      >
+                        Remove project
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="admin__section-header">
+                  <h3 className="admin__subtitle">Experience</h3>
+                  <button
+                    type="button"
+                    className="admin__button admin__button--ghost"
+                    onClick={handleAddPortfolioExperience}
+                  >
+                    Add role
+                  </button>
+                </div>
+                <div className="admin__list">
+                  {getPortfolioSection(draftSite).experience.map((item, index) => (
+                    <div className="admin__card" key={`portfolio-exp-${index}`}>
+                      <div className="admin__grid">
+                        <label className="admin__label">
+                          Role
+                          <input
+                            className="admin__input"
+                            value={item.role || ''}
+                            onChange={(event) =>
+                              handlePortfolioExperienceChange(
+                                index,
+                                'role',
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+                        <label className="admin__label admin__label--full">
+                          Scope
+                          <textarea
+                            className="admin__input admin__input--textarea"
+                            value={item.scope || ''}
+                            onChange={(event) =>
+                              handlePortfolioExperienceChange(
+                                index,
+                                'scope',
+                                event.target.value
+                              )
+                            }
+                            rows={2}
+                          />
+                        </label>
+                      </div>
+                      <button
+                        type="button"
+                        className="admin__button admin__button--ghost"
+                        onClick={() => handleRemovePortfolioExperience(index)}
+                      >
+                        Remove role
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
               </div>
@@ -2854,8 +3936,28 @@ export default function App() {
   }
 
   return (
-      <div className="page mx-auto max-w-3xl px-5 pb-10 pt-9 sm:px-6 sm:pb-16 sm:pt-12">
-      {!routePortal && (
+    <div
+      className={`page mx-auto px-5 pb-10 pt-9 sm:px-6 sm:pb-16 sm:pt-12 ${
+        isPortfolioView ? 'max-w-5xl' : 'max-w-3xl'
+      }`}
+    >
+      {isPortfolioView && (
+        <div className="portfolio-topbar">
+          {getPortfolioSection(site).cv_url && (
+            <a
+              className="portfolio-topbar__cv"
+              href={getPortfolioSection(site).cv_url}
+              onClick={(event) => {
+                event.preventDefault()
+                setResumeOpen(true)
+              }}
+            >
+              Resume
+            </a>
+          )}
+        </div>
+      )}
+      {!routePortal && !isPortfolioRoute && (
         <div className="hero-wrap">
           <header className="hero-card">
             <div className="hero-card__inner flex flex-col items-center text-center">
@@ -2995,16 +4097,17 @@ export default function App() {
             isServicesPortal(routePortal.portal, routePortal.index)
               ? ' portal-page--services'
               : ''
-          }`}
+          }${isPortfolioPortal(routePortal.portal) ? ' portal-page--portfolio' : ''}`}
         >
           <div className="portal-page__header">
-            <p className="portal-page__meta">{routePortal.portal.meta}</p>
+            {!isPortfolioPortal(routePortal.portal) && (
+              <p className="portal-page__meta">{routePortal.portal.meta}</p>
+            )}
             <h1 className="portal-page__title font-title">
-              {routePortal.portal.title}
+              {isPortfolioPortal(routePortal.portal)
+                ? getPortfolioSection(site).name
+                : routePortal.portal.title}
             </h1>
-            <Link className="portal-page__back" to="/" onClick={() => window.location.assign('/')}>
-              Back to home
-            </Link>
           </div>
           <div className="portal-page__body">
             {renderPortalContent(routePortal.portal, routePortal.index)}
@@ -3012,7 +4115,297 @@ export default function App() {
         </section>
       )}
 
-      {!routePortal && (
+      {isPortfolioRoute && !routePortal && (
+        <section className="portal-page portal-page--portfolio">
+          <div className="portal-page__header">
+            <h1 className="portal-page__title font-title">
+              {getPortfolioSection(site).name}
+            </h1>
+          </div>
+          <div className="portal-page__body">{renderPortfolioContent()}</div>
+        </section>
+      )}
+
+      {portfolioCallOpen && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => {
+            setPortfolioCallOpen(false)
+            setWorkFormContext('portal')
+          }}
+        >
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Book a call"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="modal__close"
+              onClick={() => {
+                setPortfolioCallOpen(false)
+                setWorkFormContext('portal')
+              }}
+              aria-label="Close modal"
+            >
+              Close
+            </button>
+            <p className="modal__meta">Portfolio</p>
+            <h2 className="modal__title">Book a Call</h2>
+            <div className="work-form">
+              <div className="work-form__grid">
+                <label
+                  className={`work-form__label${workFormFieldErrors.name ? ' work-form__label--error' : ''}`}
+                >
+                  Name
+                  <input
+                    className={`work-form__input${workFormFieldErrors.name ? ' work-form__input--error' : ''}`}
+                    value={workForm.name}
+                    onChange={(event) =>
+                      updateWorkFormField('name', event.target.value)
+                    }
+                    required
+                  />
+                  {workFormFieldErrors.name && (
+                    <span className="work-form__hint">Required</span>
+                  )}
+                </label>
+                <label
+                  className={`work-form__label${workFormFieldErrors.industry ? ' work-form__label--error' : ''}`}
+                >
+                  Profession / Industry
+                  <select
+                    className={`work-form__input${workFormFieldErrors.industry ? ' work-form__input--error' : ''}`}
+                    value={workForm.industry}
+                    onChange={(event) =>
+                      updateWorkFormField('industry', event.target.value)
+                    }
+                    required
+                  >
+                    <option value="">Select</option>
+                    {getWorkFormConfig(activeContentPortal || {}).industries.map(
+                      (industry) => (
+                        <option key={industry} value={industry}>
+                          {industry}
+                        </option>
+                      )
+                    )}
+                  </select>
+                  {workFormFieldErrors.industry && (
+                    <span className="work-form__hint">Required</span>
+                  )}
+                </label>
+                <label
+                  className={`work-form__label${workFormFieldErrors.email ? ' work-form__label--error' : ''}`}
+                >
+                  Email
+                  <input
+                    className={`work-form__input${workFormFieldErrors.email ? ' work-form__input--error' : ''}`}
+                    type="email"
+                    value={workForm.email}
+                    onChange={(event) =>
+                      updateWorkFormField('email', event.target.value)
+                    }
+                    required
+                  />
+                  {workFormFieldErrors.email && (
+                    <span className="work-form__hint">Required</span>
+                  )}
+                </label>
+                <label
+                  className={`work-form__label${workFormFieldErrors.phone ? ' work-form__label--error' : ''}`}
+                >
+                  Phone number
+                  <input
+                    className={`work-form__input${workFormFieldErrors.phone ? ' work-form__input--error' : ''}`}
+                    value={workForm.phone}
+                    onChange={(event) =>
+                      updateWorkFormField('phone', event.target.value)
+                    }
+                    required
+                  />
+                  {workFormFieldErrors.phone && (
+                    <span className="work-form__hint">Required</span>
+                  )}
+                </label>
+                <label
+                  className={`work-form__label work-form__label--full${workFormFieldErrors.message ? ' work-form__label--error' : ''}`}
+                >
+                  Message
+                  <textarea
+                    className={`work-form__input${workFormFieldErrors.message ? ' work-form__input--error' : ''}`}
+                    value={workForm.message}
+                    onChange={(event) =>
+                      updateWorkFormField('message', event.target.value)
+                    }
+                    rows={4}
+                    required
+                  />
+                  {workFormFieldErrors.message && (
+                    <span className="work-form__hint">Required</span>
+                  )}
+                </label>
+                <label
+                  className={`work-form__label work-form__checkbox${workFormFieldErrors.agreement ? ' work-form__label--error' : ''}`}
+                >
+                  <input
+                    className={`work-form__input${workFormFieldErrors.agreement ? ' work-form__input--error' : ''}`}
+                    type="checkbox"
+                    checked={workForm.agreement}
+                    onChange={(event) =>
+                      updateWorkFormField('agreement', event.target.checked)
+                    }
+                    required
+                  />
+                  <span>
+                    {getWorkFormConfig(activeContentPortal || {}).agreement_label}
+                  </span>
+                  {workFormFieldErrors.agreement && (
+                    <span className="work-form__hint">Required</span>
+                  )}
+                </label>
+              </div>
+              <div className="work-form__grid">
+                <label
+                  className={`work-form__label${workFormFieldErrors.date ? ' work-form__label--error' : ''}`}
+                >
+                  Booking date
+                  <input
+                    className={`work-form__input${workFormFieldErrors.date ? ' work-form__input--error' : ''}`}
+                    type="date"
+                    min={todayDate}
+                    value={workForm.date}
+                    onChange={(event) =>
+                      updateWorkFormField('date', event.target.value)
+                    }
+                    required
+                  />
+                  {workFormFieldErrors.date && (
+                    <span className="work-form__hint">Required</span>
+                  )}
+                </label>
+                <label
+                  className={`work-form__label${workFormFieldErrors.time ? ' work-form__label--error' : ''}`}
+                >
+                  Time
+                  <input
+                    className={`work-form__input${workFormFieldErrors.time ? ' work-form__input--error' : ''}`}
+                    type="time"
+                    min={workForm.date === todayDate ? currentTime : undefined}
+                    value={workForm.time}
+                    onChange={(event) =>
+                      updateWorkFormField('time', event.target.value)
+                    }
+                    required
+                  />
+                  {workFormFieldErrors.time && (
+                    <span className="work-form__hint">Required</span>
+                  )}
+                </label>
+                <label
+                  className={`work-form__label${workFormFieldErrors.timezone ? ' work-form__label--error' : ''}`}
+                >
+                  Timezone
+                  <select
+                    className={`work-form__input${workFormFieldErrors.timezone ? ' work-form__input--error' : ''}`}
+                    value={workForm.timezone}
+                    onChange={(event) =>
+                      updateWorkFormField('timezone', event.target.value)
+                    }
+                    required
+                  >
+                    <option value="">Select</option>
+                    {getWorkFormConfig(activeContentPortal || {}).timezones.map(
+                      (timezone) => (
+                        <option key={timezone} value={timezone}>
+                          {timezone}
+                        </option>
+                      )
+                    )}
+                  </select>
+                  {workFormFieldErrors.timezone && (
+                    <span className="work-form__hint">Required</span>
+                  )}
+                </label>
+                <label
+                  className={`work-form__label${workFormFieldErrors.meeting_mode ? ' work-form__label--error' : ''}`}
+                >
+                  Mode of meeting
+                  <select
+                    className={`work-form__input${workFormFieldErrors.meeting_mode ? ' work-form__input--error' : ''}`}
+                    value={workForm.meeting_mode}
+                    onChange={(event) =>
+                      updateWorkFormField('meeting_mode', event.target.value)
+                    }
+                    required
+                  >
+                    <option value="">Select</option>
+                    {getWorkFormConfig(activeContentPortal || {}).meeting_modes.map(
+                      (mode) => (
+                        <option key={mode} value={mode}>
+                          {mode}
+                        </option>
+                      )
+                    )}
+                  </select>
+                  {workFormFieldErrors.meeting_mode && (
+                    <span className="work-form__hint">Required</span>
+                  )}
+                </label>
+              </div>
+              {workFormError && <p className="work-form__error">{workFormError}</p>}
+              {workFormStatus && (
+                <p className="work-form__status">{workFormStatus}</p>
+              )}
+              <button
+                type="button"
+                className="work-form__submit"
+                onClick={handleWorkFormSubmit}
+              >
+                Book call
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resumeOpen && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => setResumeOpen(false)}
+        >
+          <div
+            className="modal resume-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Resume"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="modal__close"
+              onClick={() => setResumeOpen(false)}
+              aria-label="Close resume"
+            >
+              Close
+            </button>
+            <p className="modal__meta">Resume</p>
+            <h2 className="modal__title">Victor M Fabian</h2>
+            <div className="resume-modal__frame">
+              <iframe
+                src={getPortfolioSection(site).cv_url}
+                title="Resume"
+              ></iframe>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!routePortal && !isPortfolioRoute && (
         <nav className="portal-grid mt-6 sm:mt-8" aria-label="Primary">
           {portals.map((portal, index) => {
             const route = portalRoutes.find((item) => item.index === index)
@@ -3050,6 +4443,13 @@ export default function App() {
               </Link>
             )
           })}
+          {!hasPortfolioPortal && (
+            <Link to="/victormfabian" className="reveal portal-card" data-animate>
+              <div className="portal-card__meta">Portfolio</div>
+              <h2 className="portal-card__title font-title">Victor M Fabian</h2>
+              <span className="portal-card__glow" aria-hidden="true"></span>
+            </Link>
+          )}
         </nav>
       )}
 
@@ -3309,13 +4709,16 @@ export default function App() {
                 {checkoutStatus && (
                   <p className="shop-detail__status">{checkoutStatus}</p>
                 )}
+                {!session?.user && (
+                  <p className="shop-detail__hint">Sign in to place an order.</p>
+                )}
                 <button
                   className="shop-detail__checkout"
                   type="button"
                   onClick={handleCheckoutSubmit}
-                  disabled={!activeShopSize}
+                  disabled={!activeShopSize || !session?.user}
                 >
-                  Proceed to checkout
+                  {session?.user ? 'Proceed to checkout' : 'Sign in to checkout'}
                 </button>
               </div>
             </div>
@@ -3363,585 +4766,6 @@ export default function App() {
                 <img src={activeMedia} alt="Media" />
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {activePortal && (
-        <div
-          className="modal-backdrop"
-          role="presentation"
-          onClick={() => {
-            setActivePortal(null)
-            setActivePortalIndex(null)
-          }}
-        >
-          <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={activePortal.title}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="modal__close"
-              onClick={() => {
-                setActivePortal(null)
-                setActivePortalIndex(null)
-              }}
-              aria-label="Close modal"
-            >
-              Close
-            </button>
-            <p className="modal__meta">{activePortal.meta}</p>
-            <h2 className="modal__title">{activePortal.title}</h2>
-            {activePortalIndex === 0 && renderServiceList(activePortal)}
-            {isSuccessKitPortal(activePortal) && (
-              <div className="kit-sections">
-                {SUCCESS_KIT_SECTIONS.map((section) => {
-                  const items = getSuccessKit(activePortal)[section.key] || []
-                  return (
-                    <div className="kit-section" key={section.key}>
-                      <h3 className="kit-title">{section.label}</h3>
-                      <ul className="kit-list">
-                        {items.map((item, itemIndex) => (
-                          <li className="kit-item" key={`${section.key}-${itemIndex}`}>
-                            {item.link ? (
-                              <a
-                                className="kit-item__title kit-item__link"
-                                href={item.link}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                {item.title}
-                              </a>
-                            ) : (
-                              <div className="kit-item__title">{item.title}</div>
-                            )}
-                            {item.tags && (
-                              <div className="kit-item__tags">
-                                {item.tags.split(',').map((tag) => (
-                                  <span className="kit-item__tag" key={tag.trim()}>
-                                    {tag.trim()}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-            {isShopPortal(activePortal) && (
-              <div className="shop-panel">
-                <div className="shop-label">Currency</div>
-                <select
-                  className="shop-select"
-                  value={activeCurrency}
-                  onChange={(event) => setActiveCurrency(event.target.value)}
-                  aria-label="Currency"
-                >
-                  {SHOP_CURRENCIES.map((currency) => (
-                    <option key={currency} value={currency}>
-                      {currency}
-                    </option>
-                  ))}
-                </select>
-                <div className="shop-label">Category</div>
-                <div className="shop-tabs" role="tablist" aria-label="Shop categories">
-                  {SHOP_TABS.map((tab) => (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      className={`shop-tab${activeShopTab === tab.key ? ' is-active' : ''}`}
-                      onClick={() => setActiveShopTab(tab.key)}
-                      role="tab"
-                      aria-selected={activeShopTab === tab.key}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-                {getShop(activePortal).enabled ? (
-                  <div className="shop-grid">
-                    {getShop(activePortal).items
-                      .filter((item) =>
-                        activeShopTab === 'all' ? true : item.category === activeShopTab
-                      )
-                      .map((item, itemIndex) => (
-                        <div className="shop-card" key={`${item.title}-${itemIndex}`}>
-                          <div
-                            className="shop-card__media media-protect media-protect--overlay"
-                            onContextMenu={preventContextMenu}
-                            onCopy={preventCopy}
-                            onCut={preventCopy}
-                          >
-                            {item.image ? (
-                              <img
-                                src={item.image}
-                                alt={item.title}
-                                onContextMenu={preventContextMenu}
-                                onDragStart={preventDragStart}
-                                onCopy={preventCopy}
-                                onCut={preventCopy}
-                                draggable={false}
-                              />
-                            ) : (
-                              <div className="shop-card__placeholder">Image</div>
-                            )}
-                          </div>
-                          <div className="shop-card__title">{item.title}</div>
-                      <div className="shop-card__price">
-                        {formatCurrencyAmount(
-                          getItemAmount(
-                            item,
-                            activeCurrency,
-                            getShop(activePortal).currency_rates
-                          ),
-                          activeCurrency
-                        )}
-                      </div>
-                          <button
-                            className="shop-card__cta"
-                            type="button"
-                            onClick={() => {
-                              setActiveShopItem(item)
-                              setActiveShopSize('')
-                            }}
-                          >
-                            View
-                          </button>
-                        </div>
-                      ))}
-                  </div>
-                ) : (
-                  <p className="shop-closed">Shop is currently closed.</p>
-                )}
-              </div>
-            )}
-            {isWorkWithMePortal(activePortal) && (
-              <div className="work-form">
-                <div className="work-form__grid">
-                  <label
-                    className={`work-form__label${workFormFieldErrors.service ? ' work-form__label--error' : ''}`}
-                  >
-                    Service
-                    <select
-                      className={`work-form__input${workFormFieldErrors.service ? ' work-form__input--error' : ''}`}
-                      value={workForm.service}
-                      onChange={(event) =>
-                        updateWorkFormField('service', event.target.value)
-                      }
-                      required
-                    >
-                      <option value="">Select</option>
-                      {getWorkFormConfig(activePortal).services.map((service) => (
-                        <option key={service} value={service}>
-                          {service}
-                        </option>
-                      ))}
-                    </select>
-                    {workFormFieldErrors.service && (
-                      <span className="work-form__hint">Required</span>
-                    )}
-                  </label>
-                  <label
-                    className={`work-form__label${workFormFieldErrors.name ? ' work-form__label--error' : ''}`}
-                  >
-                    Name
-                    <input
-                      className={`work-form__input${workFormFieldErrors.name ? ' work-form__input--error' : ''}`}
-                      value={workForm.name}
-                      onChange={(event) =>
-                        updateWorkFormField('name', event.target.value)
-                      }
-                      required
-                    />
-                    {workFormFieldErrors.name && (
-                      <span className="work-form__hint">Required</span>
-                    )}
-                  </label>
-                  <label
-                    className={`work-form__label${workFormFieldErrors.industry ? ' work-form__label--error' : ''}`}
-                  >
-                    Profession / Industry
-                    <select
-                      className={`work-form__input${workFormFieldErrors.industry ? ' work-form__input--error' : ''}`}
-                      value={workForm.industry}
-                      onChange={(event) =>
-                        updateWorkFormField('industry', event.target.value)
-                      }
-                      required
-                    >
-                      <option value="">Select</option>
-                      {getWorkFormConfig(activePortal).industries.map((industry) => (
-                        <option key={industry} value={industry}>
-                          {industry}
-                        </option>
-                      ))}
-                    </select>
-                    {workFormFieldErrors.industry && (
-                      <span className="work-form__hint">Required</span>
-                    )}
-                  </label>
-                  <label className="work-form__label">
-                    Other
-                    <input
-                      className="work-form__input"
-                      value={workForm.other}
-                      onChange={(event) =>
-                        updateWorkFormField('other', event.target.value)
-                      }
-                    />
-                  </label>
-                  <label
-                    className={`work-form__label${workFormFieldErrors.email ? ' work-form__label--error' : ''}`}
-                  >
-                    Email
-                    <input
-                      className={`work-form__input${workFormFieldErrors.email ? ' work-form__input--error' : ''}`}
-                      type="email"
-                      value={workForm.email}
-                      onChange={(event) =>
-                        updateWorkFormField('email', event.target.value)
-                      }
-                      required
-                    />
-                    {workFormFieldErrors.email && (
-                      <span className="work-form__hint">Required</span>
-                    )}
-                  </label>
-                  <label
-                    className={`work-form__label${workFormFieldErrors.phone ? ' work-form__label--error' : ''}`}
-                  >
-                    Phone number
-                    <input
-                      className={`work-form__input${workFormFieldErrors.phone ? ' work-form__input--error' : ''}`}
-                      value={workForm.phone}
-                      onChange={(event) =>
-                        updateWorkFormField('phone', event.target.value)
-                      }
-                      required
-                    />
-                    {workFormFieldErrors.phone && (
-                      <span className="work-form__hint">Required</span>
-                    )}
-                  </label>
-                  <label
-                    className={`work-form__label work-form__label--full${workFormFieldErrors.message ? ' work-form__label--error' : ''}`}
-                  >
-                    Message
-                    <textarea
-                      className={`work-form__input${workFormFieldErrors.message ? ' work-form__input--error' : ''}`}
-                      value={workForm.message}
-                      onChange={(event) =>
-                        updateWorkFormField('message', event.target.value)
-                      }
-                      rows={4}
-                      required
-                    />
-                    {workFormFieldErrors.message && (
-                      <span className="work-form__hint">Required</span>
-                    )}
-                  </label>
-                  <label
-                    className={`work-form__label work-form__label--full work-form__checkbox${workFormFieldErrors.agreement ? ' work-form__label--error' : ''}`}
-                  >
-                    <input
-                      className={`work-form__input${workFormFieldErrors.agreement ? ' work-form__input--error' : ''}`}
-                      type="checkbox"
-                      checked={workForm.agreement}
-                      onChange={(event) =>
-                        updateWorkFormField('agreement', event.target.checked)
-                      }
-                      required
-                    />
-                    <span>{getWorkFormConfig(activePortal).agreement_label}</span>
-                    {workFormFieldErrors.agreement && (
-                      <span className="work-form__hint">Required</span>
-                    )}
-                  </label>
-                </div>
-                <div className="work-form__grid">
-                  <label
-                    className={`work-form__label${workFormFieldErrors.date ? ' work-form__label--error' : ''}`}
-                  >
-                    Booking date
-                    <input
-                      className={`work-form__input${workFormFieldErrors.date ? ' work-form__input--error' : ''}`}
-                      type="date"
-                      min={todayDate}
-                      value={workForm.date}
-                      onChange={(event) =>
-                        updateWorkFormField('date', event.target.value)
-                      }
-                      required
-                    />
-                    {workFormFieldErrors.date && (
-                      <span className="work-form__hint">Required</span>
-                    )}
-                  </label>
-                  <label
-                    className={`work-form__label${workFormFieldErrors.time ? ' work-form__label--error' : ''}`}
-                  >
-                    Time
-                    <input
-                      className={`work-form__input${workFormFieldErrors.time ? ' work-form__input--error' : ''}`}
-                      type="time"
-                      min={workForm.date === todayDate ? currentTime : undefined}
-                      value={workForm.time}
-                      onChange={(event) =>
-                        updateWorkFormField('time', event.target.value)
-                      }
-                      required
-                    />
-                    {workFormFieldErrors.time && (
-                      <span className="work-form__hint">Required</span>
-                    )}
-                  </label>
-                  <label
-                    className={`work-form__label${workFormFieldErrors.timezone ? ' work-form__label--error' : ''}`}
-                  >
-                    Timezone
-                    <select
-                      className={`work-form__input${workFormFieldErrors.timezone ? ' work-form__input--error' : ''}`}
-                      value={workForm.timezone}
-                      onChange={(event) =>
-                        updateWorkFormField('timezone', event.target.value)
-                      }
-                      required
-                    >
-                      <option value="">Select</option>
-                      {getWorkFormConfig(activePortal).timezones.map((timezone) => (
-                        <option key={timezone} value={timezone}>
-                          {timezone}
-                        </option>
-                      ))}
-                    </select>
-                    {workFormFieldErrors.timezone && (
-                      <span className="work-form__hint">Required</span>
-                    )}
-                  </label>
-                  <label
-                    className={`work-form__label${workFormFieldErrors.meeting_mode ? ' work-form__label--error' : ''}`}
-                  >
-                    Mode of meeting
-                    <select
-                      className={`work-form__input${workFormFieldErrors.meeting_mode ? ' work-form__input--error' : ''}`}
-                      value={workForm.meeting_mode}
-                      onChange={(event) =>
-                        updateWorkFormField('meeting_mode', event.target.value)
-                      }
-                      required
-                    >
-                      <option value="">Select</option>
-                      {getWorkFormConfig(activePortal).meeting_modes.map((mode) => (
-                        <option key={mode} value={mode}>
-                          {mode}
-                        </option>
-                      ))}
-                    </select>
-                    {workFormFieldErrors.meeting_mode && (
-                      <span className="work-form__hint">Required</span>
-                    )}
-                  </label>
-                </div>
-                {workFormError && <p className="work-form__error">{workFormError}</p>}
-                {workFormStatus && (
-                  <p className="work-form__status">{workFormStatus}</p>
-                )}
-                <button
-                  type="button"
-                  className="work-form__submit"
-                  onClick={handleWorkFormSubmit}
-                >
-                  Book call
-                </button>
-              </div>
-            )}
-            {activeShopItem && (
-              <div
-                className="shop-detail-backdrop"
-                role="presentation"
-                onClick={() => {
-                  setActiveShopItem(null)
-                  setActiveShopSize('')
-                  setCheckoutForm({
-                    fullName: '',
-                    address: '',
-                    email: '',
-                    phone: '',
-                  })
-                  setCheckoutError('')
-                  setCheckoutStatus('')
-                }}
-              >
-                <div
-                  className="shop-detail"
-                  role="dialog"
-                  aria-modal="true"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    className="shop-detail__close"
-                    onClick={() => {
-                      setActiveShopItem(null)
-                      setActiveShopSize('')
-                      setCheckoutForm({
-                        fullName: '',
-                        address: '',
-                        email: '',
-                        phone: '',
-                      })
-                      setCheckoutError('')
-                      setCheckoutStatus('')
-                    }}
-                  >
-                    Close
-                  </button>
-                  <div
-                    className="shop-detail__media media-protect media-protect--overlay"
-                    onContextMenu={preventContextMenu}
-                    onCopy={preventCopy}
-                    onCut={preventCopy}
-                  >
-                    {(activeShopItem.images?.length
-                      ? activeShopItem.images
-                      : activeShopItem.image
-                        ? [activeShopItem.image]
-                        : []
-                    ).map((src, index) => (
-                      <img
-                        src={src}
-                        alt={activeShopItem.title}
-                        key={`${src}-${index}`}
-                        onContextMenu={preventContextMenu}
-                        onDragStart={preventDragStart}
-                        onCopy={preventCopy}
-                        onCut={preventCopy}
-                        draggable={false}
-                      />
-                    ))}
-                  </div>
-                  <div className="shop-detail__info">
-                    <div className="shop-detail__title">{activeShopItem.title}</div>
-                    <div className="shop-detail__price">
-                      {formatCurrencyAmount(
-                        getItemAmount(
-                          activeShopItem,
-                          activeCurrency,
-                          getShop(activePortal).currency_rates
-                        ),
-                        activeCurrency
-                      )}
-                    </div>
-                    {activeShopItem.description && (
-                      <p className="shop-detail__description">
-                        {activeShopItem.description}
-                      </p>
-                    )}
-                    {activeShopItem.sizes?.length ? (
-                      <div className="shop-detail__sizes">
-                        {activeShopItem.sizes.map((size) => (
-                          <button
-                            key={size}
-                            type="button"
-                            className={activeShopSize === size ? 'is-active' : ''}
-                            onClick={() => setActiveShopSize(size)}
-                          >
-                            {size}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                    <div className="shop-detail__form">
-                      <label className="shop-detail__label">
-                        Full name
-                        <input
-                          value={checkoutForm.fullName}
-                          onChange={(event) =>
-                            setCheckoutForm({
-                              ...checkoutForm,
-                              fullName: event.target.value,
-                            })
-                          }
-                          required
-                        />
-                      </label>
-                      <label className="shop-detail__label">
-                        Delivery address
-                        <input
-                          value={checkoutForm.address}
-                          onChange={(event) =>
-                            setCheckoutForm({
-                              ...checkoutForm,
-                              address: event.target.value,
-                            })
-                          }
-                          required
-                        />
-                      </label>
-                      <label className="shop-detail__label">
-                        Email
-                        <input
-                          type="email"
-                          value={checkoutForm.email}
-                          onChange={(event) =>
-                            setCheckoutForm({
-                              ...checkoutForm,
-                              email: event.target.value,
-                            })
-                          }
-                          required
-                        />
-                      </label>
-                      <label className="shop-detail__label">
-                        Phone number
-                        <input
-                          value={checkoutForm.phone}
-                          onChange={(event) =>
-                            setCheckoutForm({
-                              ...checkoutForm,
-                              phone: event.target.value,
-                            })
-                          }
-                          required
-                        />
-                      </label>
-                      {checkoutError && (
-                        <p className="shop-detail__error">{checkoutError}</p>
-                      )}
-                      {checkoutStatus && (
-                        <p className="shop-detail__status">{checkoutStatus}</p>
-                      )}
-                      <button
-                        className="shop-detail__checkout"
-                        type="button"
-                        onClick={handleCheckoutSubmit}
-                        disabled={!activeShopSize}
-                      >
-                        Proceed to checkout
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {activePortal.href && activePortal.href !== '#' && (
-              <a
-                className="modal__link"
-                href={activePortal.href}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open link
-              </a>
-            )}
           </div>
         </div>
       )}
