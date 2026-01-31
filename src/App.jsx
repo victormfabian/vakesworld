@@ -26,9 +26,37 @@ const loadCachedJSON = (key) => {
   }
 }
 
+const orderPortalsForHome = (items = []) =>
+  [...items].sort((a, b) => {
+    const aMeta = a?.meta?.toLowerCase() || ''
+    const aTitle = a?.title?.toLowerCase() || ''
+    const bMeta = b?.meta?.toLowerCase() || ''
+    const bTitle = b?.title?.toLowerCase() || ''
+    const aPriority =
+      aMeta.includes('work with') || aTitle.includes('start a project')
+        ? 0
+        : aMeta.includes('service') || aTitle.includes('service')
+          ? 1
+          : 2
+    const bPriority =
+      bMeta.includes('work with') || bTitle.includes('start a project')
+        ? 0
+        : bMeta.includes('service') || bTitle.includes('service')
+          ? 1
+          : 2
+    if (aPriority !== bPriority) {
+      return aPriority - bPriority
+    }
+    const aOrder = Number.isFinite(a?.sort_order) ? a.sort_order : 999
+    const bOrder = Number.isFinite(b?.sort_order) ? b.sort_order : 999
+    return aOrder - bOrder
+  })
+
 export default function App() {
   const cachedSite = loadCachedJSON('vakes_site')
   const cachedPortals = loadCachedJSON('vakes_portals')
+  const orderedCachedPortals =
+    cachedPortals?.length ? orderPortalsForHome(cachedPortals) : []
   const [isAdminView, setIsAdminView] = useState(
     window.location.hash === ADMIN_HASH
   )
@@ -41,22 +69,23 @@ export default function App() {
           hero_tagline: '',
           hero_subline: '',
           logo_url: '',
+          header_logo_url: '',
           instagram_url: '',
           tiktok_url: '',
           youtube_url: '',
+          behance_url: '',
+          dribbble_url: '',
           footer_text: '',
           about_section: DEFAULT_ABOUT,
           portfolio_section: DEFAULT_PORTFOLIO,
         }
   )
-  const [portals, setPortals] = useState(
-    cachedPortals?.length ? cachedPortals : []
-  )
+  const [portals, setPortals] = useState(orderedCachedPortals)
   const [draftSite, setDraftSite] = useState(
     cachedSite ? { ...DEFAULT_SITE, ...cachedSite } : DEFAULT_SITE
   )
   const [draftPortals, setDraftPortals] = useState(
-    cachedPortals?.length ? cachedPortals : DEFAULT_PORTALS
+    orderedCachedPortals.length ? orderedCachedPortals : DEFAULT_PORTALS
   )
   const [deletedPortalIds, setDeletedPortalIds] = useState([])
   const [session, setSession] = useState(null)
@@ -76,10 +105,7 @@ export default function App() {
   const [activeShopItem, setActiveShopItem] = useState(null)
   const [activeShopSize, setActiveShopSize] = useState('')
   const [activeCurrency, setActiveCurrency] = useState('NGN')
-  const [aboutExpanded, setAboutExpanded] = useState(false)
   const [aboutModalOpen, setAboutModalOpen] = useState(false)
-  const [activeMedia, setActiveMedia] = useState(null)
-  const [activeMediaType, setActiveMediaType] = useState(null)
   const [activeServiceTab, setActiveServiceTab] = useState('all')
   const location = useLocation()
   const navigate = useNavigate()
@@ -121,25 +147,22 @@ export default function App() {
     new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   )
   const todayDate = new Date().toISOString().slice(0, 10)
-  const defaultLogoUrl = new URL('./assets/vakes-logo.png', import.meta.url).href
-
-  const isServicesPortal = (_portal, index) => index === 0
+  const [cursorVisible, setCursorVisible] = useState(false)
+  const [cursorActive, setCursorActive] = useState(false)
 
   const isSuccessKitPortal = (portal) => {
     const meta = portal?.meta?.toLowerCase() || ''
     const title = portal?.title?.toLowerCase() || ''
-    return meta.includes('success kit') || title.includes('success kit')
+    return (
+      meta.includes('success kit') ||
+      title.includes('success kit')
+    )
   }
 
   const isShopPortal = (portal) => {
     const meta = portal?.meta?.toLowerCase() || ''
     const title = portal?.title?.toLowerCase() || ''
-    return (
-      meta.includes('shop') ||
-      title.includes('shop') ||
-      portal?.sort_order === 3 ||
-      portal?.id === 3
-    )
+    return meta.includes('shop') || title.includes('shop')
   }
 
   const isWorkWithMePortal = (portal) => {
@@ -153,6 +176,36 @@ export default function App() {
     const title = portal?.title?.toLowerCase() || ''
     return meta.includes('portfolio') || title.includes('victor')
   }
+
+  const isServicesPortal = (portal) => {
+    if (
+      isSuccessKitPortal(portal) ||
+      isShopPortal(portal) ||
+      isWorkWithMePortal(portal) ||
+      isPortfolioPortal(portal)
+    ) {
+      return false
+    }
+    const meta = portal?.meta?.toLowerCase() || ''
+    const title = portal?.title?.toLowerCase() || ''
+    return (
+      meta.includes('service') ||
+      title.includes('service') ||
+      (portal?.services && portal.services.length > 0)
+    )
+  }
+
+  const orderPortals = (items = []) =>
+    [...items].sort((a, b) => {
+      const aPriority = isWorkWithMePortal(a) ? 0 : isServicesPortal(a) ? 1 : 2
+      const bPriority = isWorkWithMePortal(b) ? 0 : isServicesPortal(b) ? 1 : 2
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority
+      }
+      const aOrder = Number.isFinite(a?.sort_order) ? a.sort_order : 999
+      const bOrder = Number.isFinite(b?.sort_order) ? b.sort_order : 999
+      return aOrder - bOrder
+    })
 
   const slugify = (value) =>
     (value || '')
@@ -174,8 +227,8 @@ export default function App() {
   }
 
   const resolveHeroMediaUrl = (url) => {
-    if (!url || url.startsWith('/src/assets/')) {
-      return defaultLogoUrl
+    if (!url) {
+      return ''
     }
     return url
   }
@@ -183,8 +236,11 @@ export default function App() {
   const getServiceKey = (service, index) =>
     slugify(service?.title) || `service-${index + 1}`
 
+  const DEFAULT_SERVICES =
+    DEFAULT_PORTALS.find((portal) => portal?.services?.length)?.services || []
+
   const getServicesFromPortal = (portal) =>
-    portal?.services?.length ? portal.services : DEFAULT_PORTALS[0].services
+    portal?.services?.length ? portal.services : DEFAULT_SERVICES
 
   const getServiceTabs = (services) => [
     { key: 'all', label: 'All' },
@@ -198,7 +254,9 @@ export default function App() {
     () =>
       portals.map((portal, index) => {
         let slug = slugify(portal?.meta || portal?.title)
-        if (isServicesPortal(portal, index)) {
+        if (isSuccessKitPortal(portal)) {
+          slug = 'success-kit'
+        } else if (isServicesPortal(portal)) {
           slug = 'services'
         } else if (isShopPortal(portal)) {
           slug = 'shop'
@@ -206,8 +264,6 @@ export default function App() {
           slug = 'work-with-vakes'
         } else if (slug.includes('product')) {
           slug = 'products'
-        } else if (slug.includes('success')) {
-          slug = 'success-kit'
         } else if (isPortfolioPortal(portal)) {
           slug = 'victormfabian'
         } else if (!slug) {
@@ -222,23 +278,14 @@ export default function App() {
   )
 
   const routeSlug = location.pathname.replace(/^\/+|\/+$/g, '')
-  const routePortal = portalRoutes.find((item) => item.slug === routeSlug) || null
+  const routePortal = routeSlug
+    ? portalRoutes.find((item) => item.slug === routeSlug) || null
+    : null
   const activeContentPortal = routePortal?.portal || null
   const isPortfolioRoute = routeSlug === 'victormfabian'
   const isPortfolioView =
     isPortfolioRoute || (routePortal && isPortfolioPortal(routePortal.portal))
-
-  useEffect(() => {
-    if (typeof document === 'undefined') {
-      return
-    }
-    const isServicesRoute =
-      routePortal && isServicesPortal(routePortal.portal, routePortal.index)
-    document.body.classList.toggle('no-scroll', Boolean(isServicesRoute))
-    return () => {
-      document.body.classList.remove('no-scroll')
-    }
-  }, [routePortal])
+  const portalsForRail = orderPortalsForHome(portals)
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -253,9 +300,9 @@ export default function App() {
   useEffect(() => {
     if (!supabase) {
       setSite(DEFAULT_SITE)
-      setPortals(DEFAULT_PORTALS)
+      setPortals(orderPortals(DEFAULT_PORTALS))
       setDraftSite(DEFAULT_SITE)
-      setDraftPortals(DEFAULT_PORTALS)
+      setDraftPortals(orderPortals(DEFAULT_PORTALS))
       setHasLoadedContent(true)
       if (typeof window !== 'undefined') {
         try {
@@ -299,18 +346,18 @@ export default function App() {
         setError(portalError.message)
       }
 
-      const mergedSite = siteData ? { ...DEFAULT_SITE, ...siteData } : DEFAULT_SITE
+    const mergedSite = siteData ? { ...DEFAULT_SITE, ...siteData } : DEFAULT_SITE
+    if (!mergedSite.behance_url && mergedSite.about_section?.behance_url) {
+      mergedSite.behance_url = mergedSite.about_section.behance_url
+    }
+    if (!mergedSite.dribbble_url && mergedSite.about_section?.dribbble_url) {
+      mergedSite.dribbble_url = mergedSite.about_section.dribbble_url
+    }
       const mergedPortals = portalData?.length
         ? portalData.map((portal) => {
-            const defaultMatch =
-              DEFAULT_PORTALS.find(
-                (item) => item.meta === portal.meta || item.title === portal.title
-              ) ||
-              (portal.sort_order === 1
-                ? DEFAULT_PORTALS[0]
-                : portal.sort_order === 3
-                  ? DEFAULT_PORTALS[2]
-                  : null)
+            const defaultMatch = DEFAULT_PORTALS.find(
+              (item) => item.meta === portal.meta || item.title === portal.title
+            )
             let nextPortal = portal
             if (!portal.services && defaultMatch?.services) {
               nextPortal = { ...nextPortal, services: defaultMatch.services }
@@ -328,10 +375,11 @@ export default function App() {
           })
         : DEFAULT_PORTALS
 
+      const orderedPortals = orderPortals(mergedPortals)
       setSite(mergedSite)
-      setPortals(mergedPortals)
+      setPortals(orderedPortals)
       setDraftSite(mergedSite)
-      setDraftPortals(mergedPortals)
+      setDraftPortals(orderedPortals)
       setDeletedPortalIds([])
       setHasLoadedContent(true)
       setLoading(false)
@@ -339,7 +387,10 @@ export default function App() {
       if (typeof window !== 'undefined') {
         try {
           window.localStorage.setItem('vakes_site', JSON.stringify(mergedSite))
-          window.localStorage.setItem('vakes_portals', JSON.stringify(mergedPortals))
+          window.localStorage.setItem(
+            'vakes_portals',
+            JSON.stringify(orderedPortals)
+          )
         } catch (error) {
           // Ignore storage failures (private mode, quota).
         }
@@ -352,6 +403,58 @@ export default function App() {
       isMounted = false
     }
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    if (!window.matchMedia('(pointer: fine)').matches) {
+      return
+    }
+
+    const cursor = document.querySelector('.custom-cursor')
+    if (!cursor) {
+      return
+    }
+
+    const handleMove = (event) => {
+      cursor.style.setProperty('--cursor-x', `${event.clientX}px`)
+      cursor.style.setProperty('--cursor-y', `${event.clientY}px`)
+      if (!cursorVisible) {
+        setCursorVisible(true)
+      }
+    }
+
+    const handleEnter = () => setCursorVisible(true)
+    const handleLeave = () => setCursorVisible(false)
+
+    const handleHover = (event) => {
+      const target = event.target
+      if (!(target instanceof Element)) {
+        return
+      }
+      const isClickable = target.closest(
+        'a, button, input, textarea, select, [role="button"], .portal-card, .shop-card'
+      )
+      setCursorActive(Boolean(isClickable))
+    }
+
+    window.addEventListener('mousemove', handleMove, { passive: true })
+    window.addEventListener('mouseenter', handleEnter)
+    window.addEventListener('mouseleave', handleLeave)
+    document.addEventListener('mouseover', handleHover)
+    document.addEventListener('mouseout', handleHover)
+    document.body.classList.add('has-custom-cursor')
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseenter', handleEnter)
+      window.removeEventListener('mouseleave', handleLeave)
+      document.removeEventListener('mouseover', handleHover)
+      document.removeEventListener('mouseout', handleHover)
+      document.body.classList.remove('has-custom-cursor')
+    }
+  }, [cursorVisible])
 
   useEffect(() => {
     if (!supabase) {
@@ -668,6 +771,12 @@ export default function App() {
       ? { ...DEFAULT_ABOUT, ...siteData.about_section }
       : DEFAULT_ABOUT
 
+  const aboutSection = getAboutSection(site)
+  const behanceUrl = site.behance_url || aboutSection.behance_url
+  const dribbbleUrl = site.dribbble_url || aboutSection.dribbble_url
+  const heroMediaUrl = resolveHeroMediaUrl(site.logo_url)
+  const headerLogoUrl = resolveHeroMediaUrl(site.header_logo_url)
+
   const getPortfolioSection = (siteData) => {
     const section = siteData?.portfolio_section
       ? { ...DEFAULT_PORTFOLIO, ...siteData.portfolio_section }
@@ -853,17 +962,46 @@ export default function App() {
       hero_tagline: draftSite.hero_tagline,
       hero_subline: draftSite.hero_subline,
       logo_url: draftSite.logo_url,
+      header_logo_url: draftSite.header_logo_url,
       instagram_url: draftSite.instagram_url,
       tiktok_url: draftSite.tiktok_url,
       youtube_url: draftSite.youtube_url,
+      behance_url: draftSite.behance_url,
+      dribbble_url: draftSite.dribbble_url,
       footer_text: draftSite.footer_text,
-      about_section: draftSite.about_section || DEFAULT_ABOUT,
+      about_section: {
+        ...DEFAULT_ABOUT,
+        ...(draftSite.about_section || {}),
+        behance_url:
+          draftSite.behance_url || draftSite.about_section?.behance_url || '',
+        dribbble_url:
+          draftSite.dribbble_url || draftSite.about_section?.dribbble_url || '',
+      },
       portfolio_section: draftSite.portfolio_section || DEFAULT_PORTFOLIO,
     }
 
-    const { error: siteError } = await supabase
+    let { error: siteError } = await supabase
       .from('site_content')
       .upsert(sitePayload, { onConflict: 'id' })
+
+    if (
+      siteError &&
+      (siteError.message.includes('behance_url') ||
+        siteError.message.includes('dribbble_url') ||
+        siteError.message.includes('header_logo_url'))
+    ) {
+      const { behance_url, dribbble_url, header_logo_url, ...payloadFallback } =
+        sitePayload
+      const fallbackResult = await supabase
+        .from('site_content')
+        .upsert(payloadFallback, { onConflict: 'id' })
+      siteError = fallbackResult.error
+      if (!siteError) {
+        setStatus(
+          'Saved without Behance/Dribbble columns. Add them to site_content to store those links.'
+        )
+      }
+    }
 
     if (siteError) {
       setError(siteError.message)
@@ -943,7 +1081,7 @@ export default function App() {
     const nextPortals = [...draftPortals]
     const portal = nextPortals[portalIndex]
     const services =
-      portal.services?.length ? [...portal.services] : [...DEFAULT_PORTALS[0].services]
+      portal.services?.length ? [...portal.services] : [...DEFAULT_SERVICES]
     services[serviceIndex] = { ...services[serviceIndex], [field]: value }
     nextPortals[portalIndex] = { ...portal, services }
     setDraftPortals(nextPortals)
@@ -953,7 +1091,7 @@ export default function App() {
     const nextPortals = [...draftPortals]
     const portal = nextPortals[portalIndex]
     const services =
-      portal.services?.length ? [...portal.services] : [...DEFAULT_PORTALS[0].services]
+      portal.services?.length ? [...portal.services] : [...DEFAULT_SERVICES]
     services.push({ title: '', description: '', image: '' })
     nextPortals[portalIndex] = { ...portal, services }
     setDraftPortals(nextPortals)
@@ -963,7 +1101,7 @@ export default function App() {
     const nextPortals = [...draftPortals]
     const portal = nextPortals[portalIndex]
     const services =
-      portal.services?.length ? [...portal.services] : [...DEFAULT_PORTALS[0].services]
+      portal.services?.length ? [...portal.services] : [...DEFAULT_SERVICES]
     services.splice(serviceIndex, 1)
     nextPortals[portalIndex] = { ...portal, services }
     setDraftPortals(nextPortals)
@@ -973,7 +1111,7 @@ export default function App() {
     const nextPortals = [...draftPortals]
     const portal = nextPortals[portalIndex]
     const services =
-      portal.services?.length ? [...portal.services] : [...DEFAULT_PORTALS[0].services]
+      portal.services?.length ? [...portal.services] : [...DEFAULT_SERVICES]
     const service = services[serviceIndex]
     const media = Array.isArray(service.media) ? [...service.media] : []
     media[mediaIndex] = value
@@ -986,7 +1124,7 @@ export default function App() {
     const nextPortals = [...draftPortals]
     const portal = nextPortals[portalIndex]
     const services =
-      portal.services?.length ? [...portal.services] : [...DEFAULT_PORTALS[0].services]
+      portal.services?.length ? [...portal.services] : [...DEFAULT_SERVICES]
     const service = services[serviceIndex]
     const media = Array.isArray(service.media) ? [...service.media] : []
     media.push('')
@@ -999,7 +1137,7 @@ export default function App() {
     const nextPortals = [...draftPortals]
     const portal = nextPortals[portalIndex]
     const services =
-      portal.services?.length ? [...portal.services] : [...DEFAULT_PORTALS[0].services]
+      portal.services?.length ? [...portal.services] : [...DEFAULT_SERVICES]
     const service = services[serviceIndex]
     const media = Array.isArray(service.media) ? [...service.media] : []
     media.splice(mediaIndex, 1)
@@ -1124,25 +1262,6 @@ export default function App() {
       return
     }
     navigate(target.path)
-  }
-
-  const openMediaViewer = (url) => {
-    if (!url) {
-      return
-    }
-    const youtube = getYouTubeEmbedUrl(url)
-    if (youtube) {
-      setActiveMedia(youtube)
-      setActiveMediaType('youtube')
-      return
-    }
-    if (isVideoUrl(url)) {
-      setActiveMedia(url)
-      setActiveMediaType('video')
-      return
-    }
-    setActiveMedia(url)
-    setActiveMediaType('image')
   }
 
   const handleSuccessKitChange = (
@@ -1487,7 +1606,7 @@ export default function App() {
                           const youtubeUrl = getYouTubeEmbedUrl(item)
                           return (
                             <div
-                              className="service-media-item media-protect"
+                              className="service-media-item"
                               key={`${serviceTitle}-${mediaIndex}`}
                               onContextMenu={preventContextMenu}
                               onCopy={preventCopy}
@@ -1499,7 +1618,6 @@ export default function App() {
                                   title={serviceTitle}
                                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                   allowFullScreen
-                                  onClick={() => openMediaViewer(item)}
                                 ></iframe>
                               ) : isVideoUrl(item) ? (
                                 <video
@@ -1512,7 +1630,6 @@ export default function App() {
                                   controlsList="nodownload noplaybackrate noremoteplayback"
                                   disablePictureInPicture
                                   disableRemotePlayback
-                                  onClick={() => openMediaViewer(item)}
                                 />
                               ) : (
                                 <img
@@ -1520,7 +1637,6 @@ export default function App() {
                                   alt={serviceTitle}
                                   onDragStart={preventDragStart}
                                   draggable={false}
-                                  onClick={() => openMediaViewer(item)}
                                 />
                               )}
                             </div>
@@ -1746,17 +1862,19 @@ export default function App() {
         </div>
 
         <div className="portfolio-desktop">
-          <div className="portfolio-hero">
-            <div className="portfolio-hero__primary">
-              <div className="portfolio-hero__top">
-                {profile.image_url ? (
-                  <div className="portfolio-hero__avatar">
-                    <img src={profile.image_url} alt={profile.name} />
+          <div className="portfolio-hero-row">
+            <div className="portfolio-hero">
+              <div className="portfolio-hero__primary">
+                <div className="portfolio-hero__top">
+                  {profile.image_url ? (
+                    <div className="portfolio-hero__avatar">
+                      <img src={profile.image_url} alt={profile.name} />
+                    </div>
+                  ) : null}
+                  <div className="portfolio-hero__identity">
+                    <p className="portfolio-hero__kicker">Profile</p>
+                    <p className="portfolio-hero__title">{profile.title}</p>
                   </div>
-                ) : null}
-                <div className="portfolio-hero__identity">
-                  <p className="portfolio-hero__kicker">Profile</p>
-                  <p className="portfolio-hero__title">{profile.title}</p>
                 </div>
               </div>
               <p className="portfolio-hero__summary">{profile.summary}</p>
@@ -1826,26 +1944,25 @@ export default function App() {
                 </a>
               </div>
             </div>
-          </div>
-
-          <div className="portfolio-highlights">
-            {profile.highlights.map((item) => (
-              <div className="portfolio-card" key={item.label}>
-                <div className="portfolio-card__icon-wrap">
-                  {item.icon_url ? (
-                    <img
-                      className="portfolio-card__icon"
-                      src={item.icon_url}
-                      alt=""
-                    />
-                  ) : null}
+            <div className="portfolio-highlights">
+              {profile.highlights.map((item) => (
+                <div className="portfolio-card" key={item.label}>
+                  <div className="portfolio-card__icon-wrap">
+                    {item.icon_url ? (
+                      <img
+                        className="portfolio-card__icon"
+                        src={item.icon_url}
+                        alt=""
+                      />
+                    ) : null}
+                  </div>
+                  <div className="portfolio-card__text">
+                    <div className="portfolio-card__value">{item.value}</div>
+                    <div className="portfolio-card__label">{item.label}</div>
+                  </div>
                 </div>
-                <div className="portfolio-card__text">
-                  <div className="portfolio-card__value">{item.value}</div>
-                  <div className="portfolio-card__label">{item.label}</div>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           <div className="portfolio-grid">
@@ -1943,8 +2060,6 @@ export default function App() {
 
   const renderPortalContent = (portal, portalIndex) => (
     <>
-      {isServicesPortal(portal, portalIndex) && renderServiceList(portal)}
-      {isPortfolioPortal(portal) && renderPortfolioContent()}
       {isSuccessKitPortal(portal) && (
         <div className="kit-sections">
           {SUCCESS_KIT_SECTIONS.map((section) => {
@@ -1984,6 +2099,7 @@ export default function App() {
           })}
         </div>
       )}
+      {isServicesPortal(portal) && renderServiceList(portal)}
       {isShopPortal(portal) && renderShopAuthSection()}
       {isShopPortal(portal) && (
         <div className="shop-section">
@@ -2023,7 +2139,7 @@ export default function App() {
                 )
                 .map((item, itemIndex) => (
                   <div className="shop-card" key={`${item.title}-${itemIndex}`}>
-                    <div className="shop-card__media media-protect media-protect--overlay">
+                    <div className="shop-card__media">
                       {item.image ? (
                         <img
                           src={item.image}
@@ -2033,7 +2149,6 @@ export default function App() {
                           onCopy={preventCopy}
                           onCut={preventCopy}
                           draggable={false}
-                          onClick={() => openMediaViewer(item.image)}
                         />
                       ) : (
                         <div className="shop-card__placeholder">Image</div>
@@ -2071,31 +2186,6 @@ export default function App() {
       {isWorkWithMePortal(portal) && (
         <div className="work-form">
           <div className="work-form__grid">
-            {workFormContext !== 'portfolio' && (
-              <label
-                className={`work-form__label${workFormFieldErrors.service ? ' work-form__label--error' : ''}`}
-              >
-                Service
-                <select
-                  className={`work-form__input${workFormFieldErrors.service ? ' work-form__input--error' : ''}`}
-                  value={workForm.service}
-                  onChange={(event) =>
-                    updateWorkFormField('service', event.target.value)
-                  }
-                  required
-                >
-                  <option value="">Select</option>
-                  {getWorkFormConfig(portal).services.map((service) => (
-                    <option key={service} value={service}>
-                      {service}
-                    </option>
-                  ))}
-                </select>
-                {workFormFieldErrors.service && (
-                  <span className="work-form__hint">Required</span>
-                )}
-              </label>
-            )}
             <label
               className={`work-form__label${workFormFieldErrors.name ? ' work-form__label--error' : ''}`}
             >
@@ -2111,39 +2201,6 @@ export default function App() {
               {workFormFieldErrors.name && (
                 <span className="work-form__hint">Required</span>
               )}
-            </label>
-            <label
-              className={`work-form__label${workFormFieldErrors.industry ? ' work-form__label--error' : ''}`}
-            >
-              Profession / Industry
-              <select
-                className={`work-form__input${workFormFieldErrors.industry ? ' work-form__input--error' : ''}`}
-                value={workForm.industry}
-                onChange={(event) =>
-                  updateWorkFormField('industry', event.target.value)
-                }
-                required
-              >
-                <option value="">Select</option>
-                {getWorkFormConfig(portal).industries.map((industry) => (
-                  <option key={industry} value={industry}>
-                    {industry}
-                  </option>
-                ))}
-              </select>
-              {workFormFieldErrors.industry && (
-                <span className="work-form__hint">Required</span>
-              )}
-            </label>
-            <label className="work-form__label">
-              Other
-              <input
-                className="work-form__input"
-                value={workForm.other}
-                onChange={(event) =>
-                  updateWorkFormField('other', event.target.value)
-                }
-              />
             </label>
             <label
               className={`work-form__label${workFormFieldErrors.email ? ' work-form__label--error' : ''}`}
@@ -2178,6 +2235,64 @@ export default function App() {
                 <span className="work-form__hint">Required</span>
               )}
             </label>
+            {workFormContext !== 'portfolio' && (
+              <label
+                className={`work-form__label${workFormFieldErrors.service ? ' work-form__label--error' : ''}`}
+              >
+                Service
+                <select
+                  className={`work-form__input${workFormFieldErrors.service ? ' work-form__input--error' : ''}`}
+                  value={workForm.service}
+                  onChange={(event) =>
+                    updateWorkFormField('service', event.target.value)
+                  }
+                  required
+                >
+                  <option value="">Select</option>
+                  {getWorkFormConfig(portal).services.map((service) => (
+                    <option key={service} value={service}>
+                      {service}
+                    </option>
+                  ))}
+                </select>
+                {workFormFieldErrors.service && (
+                  <span className="work-form__hint">Required</span>
+                )}
+              </label>
+            )}
+            <label
+              className={`work-form__label${workFormFieldErrors.industry ? ' work-form__label--error' : ''}`}
+            >
+              Profession / Industry
+              <select
+                className={`work-form__input${workFormFieldErrors.industry ? ' work-form__input--error' : ''}`}
+                value={workForm.industry}
+                onChange={(event) =>
+                  updateWorkFormField('industry', event.target.value)
+                }
+                required
+              >
+                <option value="">Select</option>
+                {getWorkFormConfig(portal).industries.map((industry) => (
+                  <option key={industry} value={industry}>
+                    {industry}
+                  </option>
+                ))}
+              </select>
+              {workFormFieldErrors.industry && (
+                <span className="work-form__hint">Required</span>
+              )}
+            </label>
+            <label className="work-form__label">
+              Other
+              <input
+                className="work-form__input"
+                value={workForm.other}
+                onChange={(event) =>
+                  updateWorkFormField('other', event.target.value)
+                }
+              />
+            </label>
             <label
               className={`work-form__label work-form__label--full${workFormFieldErrors.message ? ' work-form__label--error' : ''}`}
             >
@@ -2192,23 +2307,6 @@ export default function App() {
                 required
               />
               {workFormFieldErrors.message && (
-                <span className="work-form__hint">Required</span>
-              )}
-            </label>
-            <label
-              className={`work-form__label work-form__label--full work-form__checkbox${workFormFieldErrors.agreement ? ' work-form__label--error' : ''}`}
-            >
-              <input
-                className={`work-form__input${workFormFieldErrors.agreement ? ' work-form__input--error' : ''}`}
-                type="checkbox"
-                checked={workForm.agreement}
-                onChange={(event) =>
-                  updateWorkFormField('agreement', event.target.checked)
-                }
-                required
-              />
-              <span>{getWorkFormConfig(portal).agreement_label}</span>
-              {workFormFieldErrors.agreement && (
                 <span className="work-form__hint">Required</span>
               )}
             </label>
@@ -2295,6 +2393,23 @@ export default function App() {
           </div>
           {workFormError && <p className="work-form__error">{workFormError}</p>}
           {workFormStatus && <p className="work-form__status">{workFormStatus}</p>}
+          <label
+            className={`work-form__label work-form__label--full work-form__checkbox${workFormFieldErrors.agreement ? ' work-form__label--error' : ''}`}
+          >
+            <input
+              className={`work-form__input${workFormFieldErrors.agreement ? ' work-form__input--error' : ''}`}
+              type="checkbox"
+              checked={workForm.agreement}
+              onChange={(event) =>
+                updateWorkFormField('agreement', event.target.checked)
+              }
+              required
+            />
+            <span>{getWorkFormConfig(portal).agreement_label}</span>
+            {workFormFieldErrors.agreement && (
+              <span className="work-form__hint">Required</span>
+            )}
+          </label>
           <button
             type="button"
             className="work-form__submit"
@@ -2310,7 +2425,7 @@ export default function App() {
         </a>
       )}
     </>
-  )
+  );
 
   const updateWorkFormField = (field, value) => {
     setWorkForm((prevForm) => ({ ...prevForm, [field]: value }))
@@ -2451,8 +2566,8 @@ export default function App() {
 
               {activeAdminPanel === 'content' && (
                 <div className="admin__section admin__section--panel">
-                <h2 className="admin__subtitle">Hero Content</h2>
-                <div className="admin__grid">
+                  <h2 className="admin__subtitle">Hero Content</h2>
+                  <div className="admin__grid">
                   <label className="admin__label">
                     Eyebrow
                     <input
@@ -2501,6 +2616,19 @@ export default function App() {
                         setDraftSite({
                           ...draftSite,
                           logo_url: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="admin__label">
+                    Header Logo URL
+                    <input
+                      className="admin__input"
+                      value={draftSite.header_logo_url}
+                      onChange={(event) =>
+                        setDraftSite({
+                          ...draftSite,
+                          header_logo_url: event.target.value,
                         })
                       }
                     />
@@ -2555,10 +2683,36 @@ export default function App() {
                           youtube_url: event.target.value,
                         })
                       }
-                  />
-                </label>
-              </div>
-              <div className="admin__section">
+                    />
+                  </label>
+                  <label className="admin__label">
+                    Behance URL
+                    <input
+                      className="admin__input"
+                      value={draftSite.behance_url || ''}
+                      onChange={(event) =>
+                        setDraftSite({
+                          ...draftSite,
+                          behance_url: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="admin__label">
+                    Dribbble URL
+                    <input
+                      className="admin__input"
+                      value={draftSite.dribbble_url || ''}
+                      onChange={(event) =>
+                        setDraftSite({
+                          ...draftSite,
+                          dribbble_url: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  </div>
+                  <div className="admin__section">
                 <h2 className="admin__subtitle">About VAKES</h2>
                 <div className="admin__grid">
                   <label className="admin__label">
@@ -3110,8 +3264,8 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-              </div>
-              </div>
+                  </div>
+                </div>
               )}
 
               {activeAdminPanel === 'navigation' && (
@@ -3195,7 +3349,7 @@ export default function App() {
                           />
                         </label>
                       </div>
-                      {isServicesPortal(portal, portalIndex) && (
+                      {isServicesPortal(portal) && (
                         <div className="admin__services">
                           <div className="admin__section-header">
                             <h3 className="admin__subtitle">Services List</h3>
@@ -3210,7 +3364,7 @@ export default function App() {
                           <div className="admin__list">
                             {(portal.services?.length
                               ? portal.services
-                              : DEFAULT_PORTALS[0].services
+                              : DEFAULT_SERVICES
                             ).map((service, serviceIndex) => (
                               <div
                                 className="admin__card"
@@ -3937,167 +4091,294 @@ export default function App() {
 
   return (
     <div
-      className={`page mx-auto px-5 pb-10 pt-9 sm:px-6 sm:pb-16 sm:pt-12 ${
-        isPortfolioView ? 'max-w-5xl' : 'max-w-3xl'
-      }`}
+      className="page page--light mx-auto max-w-none px-5 pb-10 pt-6 sm:px-6 sm:pb-16 sm:pt-8 lg:px-16 xl:px-20"
     >
-      {isPortfolioView && (
-        <div className="portfolio-topbar">
-          {getPortfolioSection(site).cv_url && (
-            <a
-              className="portfolio-topbar__cv"
-              href={getPortfolioSection(site).cv_url}
-              onClick={(event) => {
-                event.preventDefault()
-                setResumeOpen(true)
-              }}
-            >
-              Resume
-            </a>
-          )}
+      {!isPortfolioView && (
+        <section className="page-header">
+          <div className="page-topbar">
+            {!routePortal && !isPortfolioRoute && headerLogoUrl && (
+              <div className="page-topbar__logo">
+                <img src={headerLogoUrl} alt="VAKES" />
+              </div>
+            )}
+            {routePortal && (
+              <Link
+                className="page-topbar__back"
+                to="/"
+                onClick={() => window.location.assign('/')}
+              >
+                Back to home
+              </Link>
+            )}
+          </div>
+        </section>
+      )}
+      {isPortfolioView && getPortfolioSection(site).cv_url && (
+        <div className="page-topbar">
+          <a
+            className="page-topbar__cv"
+            href={getPortfolioSection(site).cv_url}
+            onClick={(event) => {
+              event.preventDefault()
+              setResumeOpen(true)
+            }}
+          >
+            Resume
+          </a>
         </div>
       )}
       {!routePortal && !isPortfolioRoute && (
-        <div className="hero-wrap">
-          <header className="hero-card">
-            <div className="hero-card__inner flex flex-col items-center text-center">
-              <p className="hero-card__eyebrow">{site.hero_eyebrow}</p>
-              <div className="mt-4">
-                {getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url)) ? (
-                  <div
-                    className="hero-video media-protect"
-                    onContextMenu={preventContextMenu}
-                    onCopy={preventCopy}
-                    onCut={preventCopy}
-                  >
-                    <iframe
-                      src={getYouTubeEmbedUrl(resolveHeroMediaUrl(site.logo_url))}
-                      title="VAKES"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      onClick={() =>
-                        openMediaViewer(resolveHeroMediaUrl(site.logo_url))
-                      }
-                    ></iframe>
-                  </div>
-                ) : isVideoUrl(resolveHeroMediaUrl(site.logo_url)) ? (
-                  <video
-                    className="hero-logo h-auto w-[220px] max-w-full"
-                    src={resolveHeroMediaUrl(site.logo_url)}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    controlsList="nodownload noplaybackrate noremoteplayback"
-                    disablePictureInPicture
-                    disableRemotePlayback
-                    onContextMenu={preventContextMenu}
-                    onCopy={preventCopy}
-                    onCut={preventCopy}
-                    onClick={() =>
-                      openMediaViewer(resolveHeroMediaUrl(site.logo_url))
-                    }
-                  />
-                ) : (
-                  <div className="media-protect media-protect--overlay">
-                    <img
-                      src={resolveHeroMediaUrl(site.logo_url)}
-                  alt="VAKES"
-                      className="hero-logo h-auto w-[220px] max-w-full"
+        <div className="home-layout">
+          <section className="home-hero">
+            <div className="hero-wrap">
+              <header className="hero-card">
+                <div className="hero-card__inner flex flex-col items-center text-center">
+                <h1 className="hero-card__eyebrow font-title">
+                  {site.hero_eyebrow}
+                </h1>
+                <p className="hero-card__tagline">{site.hero_tagline}</p>
+                {heroMediaUrl ? (
+                  <div className="mt-4">
+                    {getYouTubeEmbedUrl(heroMediaUrl) ? (
+                    <div
+                      className="hero-video"
                       onContextMenu={preventContextMenu}
-                      onDragStart={preventDragStart}
                       onCopy={preventCopy}
                       onCut={preventCopy}
-                      draggable={false}
-                      onClick={() =>
-                        openMediaViewer(resolveHeroMediaUrl(site.logo_url))
-                      }
+                    >
+                      <iframe
+                        src={getYouTubeEmbedUrl(heroMediaUrl)}
+                        title="VAKES"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      ></iframe>
+                    </div>
+                  ) : isVideoUrl(heroMediaUrl) ? (
+                    <video
+                      className="hero-logo h-auto w-[220px] max-w-full"
+                      src={heroMediaUrl}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      controlsList="nodownload noplaybackrate noremoteplayback"
+                      disablePictureInPicture
+                      disableRemotePlayback
+                      onContextMenu={preventContextMenu}
+                      onCopy={preventCopy}
+                      onCut={preventCopy}
                     />
+                  ) : (
+                    <div>
+                      <img
+                        src={heroMediaUrl}
+                        alt="VAKES"
+                        className="hero-logo h-auto w-[220px] max-w-full"
+                        onContextMenu={preventContextMenu}
+                        onDragStart={preventDragStart}
+                        onCopy={preventCopy}
+                        onCut={preventCopy}
+                        draggable={false}
+                      />
+                    </div>
+                  )}
+                </div>
+                ) : null}
+                <p className="hero-card__subline">{site.hero_subline}</p>
+              </div>
+              <div className="hero__confetti" aria-hidden="true"></div>
+              </header>
+            </div>
+            <aside className="hero-rail">
+              <nav className="portal-grid mt-6 sm:mt-8" aria-label="Primary">
+                {portalsForRail.map((portal, index) => {
+                  const route = portalRoutes.find((item) => item.portal === portal)
+                  const content = (
+                    <>
+                      <div className="portal-card__meta">{portal.meta}</div>
+                      <h2 className="portal-card__title font-title">
+                        {portal.title}
+                      </h2>
+                      <span className="portal-card__glow" aria-hidden="true"></span>
+                    </>
+                  )
+
+                  if (portal.href && portal.href !== '#') {
+                    return (
+                      <a
+                        key={portal.id ?? portal.meta ?? index}
+                        data-animate
+                        href={portal.href}
+                        className="reveal portal-card"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {content}
+                      </a>
+                    )
+                  }
+
+                  return (
+                    <Link
+                      key={portal.id ?? portal.meta ?? index}
+                      data-animate
+                      to={route?.path || '/'}
+                      className="reveal portal-card"
+                    >
+                      {content}
+                    </Link>
+                  )
+                })}
+              </nav>
+            </aside>
+          </section>
+          <div className="home-divider" aria-hidden="true"></div>
+          <section className="home-about">
+            <div className="home-section__header">
+              <h2 className="home-section__title home-section__title--scribble font-title">
+                About VAKES
+              </h2>
+            </div>
+            <div className="home-about__grid">
+              {aboutSection.image_url ? (
+                <div className="home-about__media">
+                  <img
+                    src={aboutSection.image_url}
+                    alt="VAKES studio"
+                    onContextMenu={preventContextMenu}
+                    onDragStart={preventDragStart}
+                    onCopy={preventCopy}
+                    onCut={preventCopy}
+                    draggable={false}
+                  />
+                </div>
+              ) : null}
+              <div className="home-about__content">
+                <p className="home-about__bio">{aboutSection.bio}</p>
+                <div className="home-about__meta">
+                  <div>
+                    <p className="home-about__label">Team</p>
+                    <ul>
+                      {(aboutSection.team || []).map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="home-about__label">Partners</p>
+                    <ul>
+                      {(aboutSection.partners || []).map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+                {(aboutSection.blog_links || []).length > 0 && (
+                  <div className="home-about__links">
+                    <p className="home-about__label">Journal</p>
+                    <ul>
+                      {aboutSection.blog_links.map((link) => (
+                        <li key={link}>
+                          <a href={link} target="_blank" rel="noreferrer">
+                            {link}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
-              </div>
-              <p className="hero-card__tagline">{site.hero_tagline}</p>
-              <p className="hero-card__subline">{site.hero_subline}</p>
-              <div className="hero-socials" aria-label="Social links">
-                <a
-                  className="hero-socials__link"
-                  href={site.instagram_url || '#'}
-                  aria-label="Instagram"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    role="img"
-                    aria-hidden="true"
-                    className="hero-socials__icon"
-                  >
-                    <path d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H7zm5 3.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6zm0 1.8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm4.6-.7a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z" />
-                  </svg>
-                </a>
-                <a
-                  className="hero-socials__link"
-                  href={site.tiktok_url || '#'}
-                  aria-label="TikTok"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    role="img"
-                    aria-hidden="true"
-                    className="hero-socials__icon"
-                  >
-                    <path d="M14 3a6.2 6.2 0 0 0 4.4 1.8V7a7.9 7.9 0 0 1-4.4-1.4v7.2a5.8 5.8 0 1 1-5-5.7v2.3a3.5 3.5 0 1 0 2.7 3.4V3h2.3z" />
-                  </svg>
-                </a>
-                <a
-                  className="hero-socials__link"
-                  href={site.youtube_url || '#'}
-                  aria-label="YouTube"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    role="img"
-                    aria-hidden="true"
-                    className="hero-socials__icon"
-                  >
-                    <path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C17.9 5 12 5 12 5s-5.9 0-7.7.3a2.7 2.7 0 0 0-1.9 1.9A28.5 28.5 0 0 0 2 12a28.5 28.5 0 0 0 .4 4.8 2.7 2.7 0 0 0 1.9 1.9c1.8.3 7.7.3 7.7.3s5.9 0 7.7-.3a2.7 2.7 0 0 0 1.9-1.9A28.5 28.5 0 0 0 22 12a28.5 28.5 0 0 0-.4-4.8zM10 15.4V8.6L15.6 12 10 15.4z" />
-                  </svg>
-                </a>
+                <div className="home-about__socials">
+                  <p className="home-about__label">Socials</p>
+                  <ul>
+                    {site.instagram_url && (
+                      <li>
+                        <a
+                          href={site.instagram_url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            role="img"
+                            aria-hidden="true"
+                          >
+                            <path d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H7zm5 3.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6zm0 1.8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm4.6-.7a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z" />
+                          </svg>
+                          Instagram
+                        </a>
+                      </li>
+                    )}
+                    {site.tiktok_url && (
+                      <li>
+                        <a
+                          href={site.tiktok_url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M14 3a6.2 6.2 0 0 0 4.4 1.8V7a7.9 7.9 0 0 1-4.4-1.4v7.2a5.8 5.8 0 1 1-5-5.7v2.3a3.5 3.5 0 1 0 2.7 3.4V3h2.3z" />
+                          </svg>
+                          TikTok
+                        </a>
+                      </li>
+                    )}
+                    {site.youtube_url && (
+                      <li>
+                        <a
+                          href={site.youtube_url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C17.9 5 12 5 12 5s-5.9 0-7.7.3a2.7 2.7 0 0 0-1.9 1.9A28.5 28.5 0 0 0 2 12a28.5 28.5 0 0 0 .4 4.8 2.7 2.7 0 0 0 1.9 1.9c1.8.3 7.7.3 7.7.3s5.9 0 7.7-.3a2.7 2.7 0 0 0 1.9-1.9A28.5 28.5 0 0 0 22 12a28.5 28.5 0 0 0-.4-4.8zM10 15.4V8.6L15.6 12 10 15.4z" />
+                          </svg>
+                          YouTube
+                        </a>
+                      </li>
+                    )}
+                    {behanceUrl && (
+                      <li>
+                        <a href={behanceUrl} target="_blank" rel="noreferrer">
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M8.8 11.4c1.5-.1 2.6-1 2.6-2.6 0-2-1.4-3-4-3H2v12h5.7c2.8 0 4.6-1.2 4.6-3.6 0-2-1.2-3.1-2.5-3.4zM4.4 7.6h2.6c1.1 0 1.8.4 1.8 1.4 0 1.1-.7 1.5-1.9 1.5H4.4V7.6zm2.8 8.2H4.4v-3.4h2.9c1.3 0 2.2.6 2.2 1.7 0 1.3-.9 1.7-2.2 1.7zM19.1 9.2c-2.3 0-4 1.6-4 4.3 0 2.8 1.6 4.4 4.2 4.4 2 0 3.3-1 3.7-2.6h-2c-.2.5-.7.9-1.7.9-1.2 0-1.9-.7-2-2h5.9c.1-2.9-1.3-5-4.1-5zm-2 3.4c.1-1 .8-1.7 1.9-1.7 1.1 0 1.7.6 1.8 1.7h-3.7zM16.6 6.5h4.8V5.2h-4.8v1.3z" />
+                          </svg>
+                          Behance
+                        </a>
+                      </li>
+                    )}
+                    {dribbbleUrl && (
+                      <li>
+                        <a href={dribbbleUrl} target="_blank" rel="noreferrer">
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm6.5 5.3a8.3 8.3 0 0 1 1.8 4.7 14.5 14.5 0 0 0-6-.1c-.2-.5-.4-.9-.6-1.4a10.7 10.7 0 0 0 4.8-3.2ZM12 3.8a8.1 8.1 0 0 1 5.2 1.9 9.2 9.2 0 0 1-4.4 2.8A36.9 36.9 0 0 0 9.6 4a8.2 8.2 0 0 1 2.4-.2Zm-4.2 1a35.5 35.5 0 0 1 3.2 4.4A30.8 30.8 0 0 1 3.8 10 8.3 8.3 0 0 1 7.8 4.8ZM3.7 12a8.7 8.7 0 0 1 .1-1.3 33.6 33.6 0 0 0 8.1-1.1c.2.4.4.8.6 1.2a13.7 13.7 0 0 0-5.7 6.6A8.3 8.3 0 0 1 3.7 12Zm8.3 8.3a8.1 8.1 0 0 1-4.2-1.2 11.8 11.8 0 0 1 5.3-6.1 24.6 24.6 0 0 1 1.4 5.3 8.1 8.1 0 0 1-2.5 2Zm4-.9a26.3 26.3 0 0 0-1.2-4.7 12.7 12.7 0 0 1 5 .2 8.3 8.3 0 0 1-3.8 4.5Z" />
+                          </svg>
+                          Dribbble
+                        </a>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+                <div className="home-about__contact">
+                  <a href={`mailto:${aboutSection.email}`}>{aboutSection.email}</a>
+                  <span>{aboutSection.phone}</span>
+                </div>
               </div>
             </div>
-            <div className="hero__confetti" aria-hidden="true"></div>
-          </header>
-          <div className="about-dock">
-            <div className={`about-dock__button${aboutExpanded ? ' is-open' : ''}`}>
-              <button
-                type="button"
-                className="about-dock__toggle"
-                onClick={() => setAboutExpanded((prev) => !prev)}
-                aria-label={aboutExpanded ? 'Close About VAKES' : 'Open About VAKES'}
-              >
-                <span className="about-dock__icon-wrap" aria-hidden="true">
-                  <svg className="about-dock__icon" viewBox="0 0 36 32">
-                    <path d="M18 30 L34 2 H2 Z" />
-                  </svg>
-                </span>
-              </button>
-              <button
-                type="button"
-                className="about-dock__label-button"
-                onClick={() => setAboutModalOpen(true)}
-              >
-                About VAKES
-              </button>
-            </div>
-          </div>
+          </section>
         </div>
       )}
 
       {routePortal && (
         <section
           className={`portal-page${
-            isServicesPortal(routePortal.portal, routePortal.index)
+            isServicesPortal(routePortal.portal)
               ? ' portal-page--services'
               : ''
-          }${isPortfolioPortal(routePortal.portal) ? ' portal-page--portfolio' : ''}`}
+          }${
+            isPortfolioPortal(routePortal.portal) ? ' portal-page--portfolio' : ''
+          }${
+            isWorkWithMePortal(routePortal.portal) ? ' portal-page--work' : ''
+          }`}
         >
           <div className="portal-page__header">
             {!isPortfolioPortal(routePortal.portal) && (
@@ -4174,31 +4455,6 @@ export default function App() {
                   )}
                 </label>
                 <label
-                  className={`work-form__label${workFormFieldErrors.industry ? ' work-form__label--error' : ''}`}
-                >
-                  Profession / Industry
-                  <select
-                    className={`work-form__input${workFormFieldErrors.industry ? ' work-form__input--error' : ''}`}
-                    value={workForm.industry}
-                    onChange={(event) =>
-                      updateWorkFormField('industry', event.target.value)
-                    }
-                    required
-                  >
-                    <option value="">Select</option>
-                    {getWorkFormConfig(activeContentPortal || {}).industries.map(
-                      (industry) => (
-                        <option key={industry} value={industry}>
-                          {industry}
-                        </option>
-                      )
-                    )}
-                  </select>
-                  {workFormFieldErrors.industry && (
-                    <span className="work-form__hint">Required</span>
-                  )}
-                </label>
-                <label
                   className={`work-form__label${workFormFieldErrors.email ? ' work-form__label--error' : ''}`}
                 >
                   Email
@@ -4232,6 +4488,31 @@ export default function App() {
                   )}
                 </label>
                 <label
+                  className={`work-form__label${workFormFieldErrors.industry ? ' work-form__label--error' : ''}`}
+                >
+                  Profession / Industry
+                  <select
+                    className={`work-form__input${workFormFieldErrors.industry ? ' work-form__input--error' : ''}`}
+                    value={workForm.industry}
+                    onChange={(event) =>
+                      updateWorkFormField('industry', event.target.value)
+                    }
+                    required
+                  >
+                    <option value="">Select</option>
+                    {getWorkFormConfig(activeContentPortal || {}).industries.map(
+                      (industry) => (
+                        <option key={industry} value={industry}>
+                          {industry}
+                        </option>
+                      )
+                    )}
+                  </select>
+                  {workFormFieldErrors.industry && (
+                    <span className="work-form__hint">Required</span>
+                  )}
+                </label>
+                <label
                   className={`work-form__label work-form__label--full${workFormFieldErrors.message ? ' work-form__label--error' : ''}`}
                 >
                   Message
@@ -4245,25 +4526,6 @@ export default function App() {
                     required
                   />
                   {workFormFieldErrors.message && (
-                    <span className="work-form__hint">Required</span>
-                  )}
-                </label>
-                <label
-                  className={`work-form__label work-form__checkbox${workFormFieldErrors.agreement ? ' work-form__label--error' : ''}`}
-                >
-                  <input
-                    className={`work-form__input${workFormFieldErrors.agreement ? ' work-form__input--error' : ''}`}
-                    type="checkbox"
-                    checked={workForm.agreement}
-                    onChange={(event) =>
-                      updateWorkFormField('agreement', event.target.checked)
-                    }
-                    required
-                  />
-                  <span>
-                    {getWorkFormConfig(activeContentPortal || {}).agreement_label}
-                  </span>
-                  {workFormFieldErrors.agreement && (
                     <span className="work-form__hint">Required</span>
                   )}
                 </label>
@@ -4360,6 +4622,25 @@ export default function App() {
               {workFormStatus && (
                 <p className="work-form__status">{workFormStatus}</p>
               )}
+              <label
+                className={`work-form__label work-form__checkbox${workFormFieldErrors.agreement ? ' work-form__label--error' : ''}`}
+              >
+                <input
+                  className={`work-form__input${workFormFieldErrors.agreement ? ' work-form__input--error' : ''}`}
+                  type="checkbox"
+                  checked={workForm.agreement}
+                  onChange={(event) =>
+                    updateWorkFormField('agreement', event.target.checked)
+                  }
+                  required
+                />
+                <span>
+                  {getWorkFormConfig(activeContentPortal || {}).agreement_label}
+                </span>
+                {workFormFieldErrors.agreement && (
+                  <span className="work-form__hint">Required</span>
+                )}
+              </label>
               <button
                 type="button"
                 className="work-form__submit"
@@ -4405,54 +4686,6 @@ export default function App() {
         </div>
       )}
 
-      {!routePortal && !isPortfolioRoute && (
-        <nav className="portal-grid mt-6 sm:mt-8" aria-label="Primary">
-          {portals.map((portal, index) => {
-            const route = portalRoutes.find((item) => item.index === index)
-            const content = (
-              <>
-                <div className="portal-card__meta">{portal.meta}</div>
-                <h2 className="portal-card__title font-title">{portal.title}</h2>
-                <span className="portal-card__glow" aria-hidden="true"></span>
-              </>
-            )
-
-            if (portal.href && portal.href !== '#') {
-              return (
-                <a
-                  key={portal.id ?? portal.meta}
-                  data-animate
-                  href={portal.href}
-                  className="reveal portal-card"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {content}
-                </a>
-              )
-            }
-
-            return (
-              <Link
-                key={portal.id ?? portal.meta}
-                data-animate
-                to={route?.path || '/'}
-                className="reveal portal-card"
-              >
-                {content}
-              </Link>
-            )
-          })}
-          {!hasPortfolioPortal && (
-            <Link to="/victormfabian" className="reveal portal-card" data-animate>
-              <div className="portal-card__meta">Portfolio</div>
-              <h2 className="portal-card__title font-title">Victor M Fabian</h2>
-              <span className="portal-card__glow" aria-hidden="true"></span>
-            </Link>
-          )}
-        </nav>
-      )}
-
       {aboutModalOpen && (
         <div
           className="modal-backdrop"
@@ -4478,7 +4711,7 @@ export default function App() {
             <h2 className="modal__title">VAKES</h2>
             <div className="about-modal__content">
               {getAboutSection(site).image_url ? (
-                <div className="about-modal__media media-protect media-protect--overlay">
+                <div className="about-modal__media">
                   <img
                     src={getAboutSection(site).image_url}
                     alt="About VAKES"
@@ -4487,7 +4720,6 @@ export default function App() {
                     onCopy={preventCopy}
                     onCut={preventCopy}
                     draggable={false}
-                    onClick={() => openMediaViewer(getAboutSection(site).image_url)}
                   />
                 </div>
               ) : null}
@@ -4594,7 +4826,7 @@ export default function App() {
               Close
             </button>
             <div
-              className="shop-detail__media media-protect media-protect--overlay"
+              className="shop-detail__media"
               onContextMenu={preventContextMenu}
               onCopy={preventCopy}
               onCut={preventCopy}
@@ -4614,7 +4846,6 @@ export default function App() {
                   onCopy={preventCopy}
                   onCut={preventCopy}
                   draggable={false}
-                  onClick={() => openMediaViewer(src)}
                 />
               ))}
             </div>
@@ -4726,51 +4957,16 @@ export default function App() {
         </div>
       )}
 
-      {activeMedia && (
-        <div
-          className="modal-backdrop media-viewer"
-          role="presentation"
-          onClick={() => {
-            setActiveMedia(null)
-            setActiveMediaType(null)
-          }}
-        >
-          <div
-            className="modal media-viewer__modal"
-            role="dialog"
-            aria-modal="true"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="modal__close"
-              onClick={() => {
-                setActiveMedia(null)
-                setActiveMediaType(null)
-              }}
-              aria-label="Close media"
-            >
-              Close
-            </button>
-            <div className="media-viewer__content">
-              {activeMediaType === 'youtube' ? (
-                <iframe
-                  src={activeMedia}
-                  title="Media"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                ></iframe>
-              ) : activeMediaType === 'video' ? (
-                <video src={activeMedia} controls playsInline />
-              ) : (
-                <img src={activeMedia} alt="Media" />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <div
+        className={`custom-cursor${cursorVisible ? ' is-visible' : ''}${
+          cursorActive ? ' is-active' : ''
+        }`}
+        aria-hidden="true"
+      >
+        <span className="custom-cursor__text">GO</span>
+      </div>
 
-      <footer className="mt-9 text-center text-[0.75rem] text-white/70">
+      <footer className="mt-9 text-center text-[0.75rem] text-black/70">
         {site.footer_text}
       </footer>
     </div>

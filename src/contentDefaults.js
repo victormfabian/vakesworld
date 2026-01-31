@@ -6,6 +6,8 @@ export const DEFAULT_ABOUT = {
   blog_links: [],
   email: 'hello@vakes.world',
   phone: '+234 000 000 0000',
+  behance_url: '',
+  dribbble_url: '',
 }
 
 export const DEFAULT_PORTFOLIO = {
@@ -105,10 +107,13 @@ export const DEFAULT_SITE = {
   hero_eyebrow: 'Curated Creative Universe',
   hero_tagline: 'Pioneering Visions',
   hero_subline: 'Art. Technology. Culture.',
-  logo_url: '/src/assets/vakes-logo.png',
+  logo_url: '',
+  header_logo_url: '',
   instagram_url: 'https://www.instagram.com/vakesworld',
   tiktok_url: 'https://www.tiktok.com/@vakesworld',
   youtube_url: 'https://www.youtube.com/@vakesworld',
+  behance_url: 'https://www.behance.net/vakesworld',
+  dribbble_url: 'https://dribbble.com/vakesworld',
   footer_text: '(c) VAKES',
   about_section: DEFAULT_ABOUT,
   portfolio_section: DEFAULT_PORTFOLIO,
@@ -203,10 +208,18 @@ export const DEFAULT_WORK_WITH_ME = {
 export const DEFAULT_PORTALS = [
   {
     id: 1,
+    meta: 'Work With VAKES',
+    title: 'Start a Project',
+    href: '#',
+    sort_order: 1,
+    work_form: DEFAULT_WORK_WITH_ME,
+  },
+  {
+    id: 2,
     meta: 'Services',
     title: 'Creative Systems',
     href: '#',
-    sort_order: 1,
+    sort_order: 2,
     services: [
       {
         title: 'Branding',
@@ -235,27 +248,19 @@ export const DEFAULT_PORTALS = [
     ],
   },
   {
-    id: 2,
+    id: 3,
     meta: 'Products & Ideas',
     title: 'Apps & SaaS',
     href: '#',
-    sort_order: 2,
-  },
-  {
-    id: 3,
-    meta: 'Shop',
-    title: 'Objects & Editions',
-    href: '#',
     sort_order: 3,
-    shop: DEFAULT_SHOP,
   },
   {
     id: 4,
-    meta: 'Work With VAKES',
-    title: 'Start a Project',
+    meta: 'Shop',
+    title: 'Objects & Editions',
     href: '#',
     sort_order: 4,
-    work_form: DEFAULT_WORK_WITH_ME,
+    shop: DEFAULT_SHOP,
   },
   {
     id: 5,
