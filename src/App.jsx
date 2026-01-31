@@ -4138,7 +4138,7 @@ export default function App() {
                 </h1>
                 <p className="hero-card__tagline">{site.hero_tagline}</p>
                 {heroMediaUrl ? (
-                  <div className="mt-4">
+                  <div className="hero-media mt-4">
                     {getYouTubeEmbedUrl(heroMediaUrl) ? (
                     <div
                       className="hero-video"
@@ -4155,7 +4155,7 @@ export default function App() {
                     </div>
                   ) : isVideoUrl(heroMediaUrl) ? (
                     <video
-                      className="hero-logo h-auto w-[220px] max-w-full"
+                      className="hero-logo"
                       src={heroMediaUrl}
                       autoPlay
                       loop
@@ -4173,7 +4173,7 @@ export default function App() {
                       <img
                         src={heroMediaUrl}
                         alt="VAKES"
-                        className="hero-logo h-auto w-[220px] max-w-full"
+                        className="hero-logo"
                         onContextMenu={preventContextMenu}
                         onDragStart={preventDragStart}
                         onCopy={preventCopy}
