@@ -107,6 +107,11 @@ export default function App() {
   const [activeCurrency, setActiveCurrency] = useState('NGN')
   const [aboutModalOpen, setAboutModalOpen] = useState(false)
   const [activeServiceTab, setActiveServiceTab] = useState('all')
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), 1)
+  })
+  const [timeFormat, setTimeFormat] = useState('24h')
   const location = useLocation()
   const navigate = useNavigate()
   const [checkoutForm, setCheckoutForm] = useState({
@@ -231,6 +236,40 @@ export default function App() {
       return ''
     }
     return url
+  }
+
+  const formatDateValue = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const parseDateValue = (value) =>
+    value ? new Date(`${value}T00:00:00`) : null
+
+  const getCalendarDays = (monthDate) => {
+    const year = monthDate.getFullYear()
+    const month = monthDate.getMonth()
+    const firstOfMonth = new Date(year, month, 1)
+    const startDay = firstOfMonth.getDay()
+    const startDate = new Date(year, month, 1 - startDay)
+    return Array.from({ length: 42 }, (_, index) => {
+      const day = new Date(startDate)
+      day.setDate(startDate.getDate() + index)
+      return day
+    })
+  }
+
+  const formatTimeLabel = (value) => {
+    if (timeFormat === '24h') {
+      return value
+    }
+    const [hourText, minuteText] = value.split(':')
+    const hour = Number(hourText)
+    const period = hour >= 12 ? 'PM' : 'AM'
+    const adjusted = hour % 12 || 12
+    return `${adjusted}:${minuteText} ${period}`
   }
 
   const getServiceKey = (service, index) =>
@@ -776,6 +815,37 @@ export default function App() {
   const dribbbleUrl = site.dribbble_url || aboutSection.dribbble_url
   const heroMediaUrl = resolveHeroMediaUrl(site.logo_url)
   const headerLogoUrl = resolveHeroMediaUrl(site.header_logo_url)
+  const todayDateObj = new Date()
+  todayDateObj.setHours(0, 0, 0, 0)
+  const selectedDateObj = parseDateValue(workForm.date)
+  const calendarDays = useMemo(
+    () => getCalendarDays(calendarMonth),
+    [calendarMonth]
+  )
+  const monthLabel = calendarMonth.toLocaleString('en-US', {
+    month: 'long',
+    year: 'numeric',
+  })
+  const selectedDateLabel = selectedDateObj
+    ? selectedDateObj.toLocaleDateString('en-US', {
+        weekday: 'short',
+        day: '2-digit',
+      })
+    : 'Select date'
+  const timeSlots = useMemo(() => {
+    const slots = []
+    for (let hour = 9; hour <= 19; hour += 1) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        if (hour === 19 && minute > 0) {
+          continue
+        }
+        slots.push(
+          `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+        )
+      }
+    }
+    return slots
+  }, [])
 
   const getPortfolioSection = (siteData) => {
     const section = siteData?.portfolio_section
@@ -2311,45 +2381,117 @@ export default function App() {
               )}
             </label>
           </div>
-          <div className="work-form__grid">
-            <label
-              className={`work-form__label${workFormFieldErrors.date ? ' work-form__label--error' : ''}`}
-            >
-              Booking date
-              <input
-                className={`work-form__input${workFormFieldErrors.date ? ' work-form__input--error' : ''}`}
-                type="date"
-                min={todayDate}
-                value={workForm.date}
-                onChange={(event) => updateWorkFormField('date', event.target.value)}
-                required
-              />
+          <div className="schedule-card">
+            <div className="schedule-card__header">
+              <div className="schedule-card__title">Booking date</div>
+              <div className="schedule-card__nav">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCalendarMonth(
+                      (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+                    )
+                  }
+                  aria-label="Previous month"
+                >
+                  ‹
+                </button>
+                <span>{monthLabel}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCalendarMonth(
+                      (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+                    )
+                  }
+                  aria-label="Next month"
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+            <div className="schedule-calendar">
+              <div className="schedule-calendar__weekdays">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                  <span key={day}>{day}</span>
+                ))}
+              </div>
+              <div className="schedule-calendar__grid">
+                {calendarDays.map((day, index) => {
+                  const inMonth = day.getMonth() === calendarMonth.getMonth()
+                  const isPast = day < todayDateObj
+                  const value = formatDateValue(day)
+                  const isSelected = workForm.date === value
+                  const isToday = formatDateValue(day) === todayDate
+                  return (
+                    <button
+                      key={`${value}-${index}`}
+                      type="button"
+                      className={`schedule-day${
+                        inMonth ? '' : ' schedule-day--outside'
+                      }${isSelected ? ' schedule-day--selected' : ''}${
+                        isToday ? ' schedule-day--today' : ''
+                      }`}
+                      onClick={() => updateWorkFormField('date', value)}
+                      disabled={!inMonth || isPast}
+                    >
+                      {day.getDate()}
+                    </button>
+                  )
+                })}
+              </div>
               {workFormFieldErrors.date && (
-                <span className="work-form__hint">Required</span>
+                <div className="schedule-card__error">Required</div>
               )}
-            </label>
-            <label
-              className={`work-form__label${workFormFieldErrors.time ? ' work-form__label--error' : ''}`}
-            >
-              Time
-              <input
-                className={`work-form__input${workFormFieldErrors.time ? ' work-form__input--error' : ''}`}
-                type="time"
-                min={workForm.date === todayDate ? currentTime : undefined}
-                value={workForm.time}
-                onChange={(event) => updateWorkFormField('time', event.target.value)}
-                required
-              />
+            </div>
+            <div className="schedule-times">
+              <div className="schedule-times__header">
+                <div className="schedule-times__label">{selectedDateLabel}</div>
+                <div className="schedule-times__toggle">
+                  <button
+                    type="button"
+                    className={timeFormat === '12h' ? 'is-active' : ''}
+                    onClick={() => setTimeFormat('12h')}
+                  >
+                    12h
+                  </button>
+                  <button
+                    type="button"
+                    className={timeFormat === '24h' ? 'is-active' : ''}
+                    onClick={() => setTimeFormat('24h')}
+                  >
+                    24h
+                  </button>
+                </div>
+              </div>
+              <div className="schedule-times__list">
+                {timeSlots.map((slot) => (
+                  <button
+                    key={slot}
+                    type="button"
+                    className={`schedule-time${
+                      workForm.time === slot ? ' is-active' : ''
+                    }`}
+                    onClick={() => updateWorkFormField('time', slot)}
+                  >
+                    {formatTimeLabel(slot)}
+                  </button>
+                ))}
+              </div>
               {workFormFieldErrors.time && (
-                <span className="work-form__hint">Required</span>
+                <div className="schedule-card__error">Required</div>
               )}
-            </label>
+            </div>
             <label
-              className={`work-form__label${workFormFieldErrors.timezone ? ' work-form__label--error' : ''}`}
+              className={`work-form__label${
+                workFormFieldErrors.timezone ? ' work-form__label--error' : ''
+              }`}
             >
               Timezone
               <select
-                className={`work-form__input${workFormFieldErrors.timezone ? ' work-form__input--error' : ''}`}
+                className={`work-form__input${
+                  workFormFieldErrors.timezone ? ' work-form__input--error' : ''
+                }`}
                 value={workForm.timezone}
                 onChange={(event) =>
                   updateWorkFormField('timezone', event.target.value)
@@ -2367,6 +2509,8 @@ export default function App() {
                 <span className="work-form__hint">Required</span>
               )}
             </label>
+          </div>
+          <div className="work-form__grid">
             <label
               className={`work-form__label${workFormFieldErrors.meeting_mode ? ' work-form__label--error' : ''}`}
             >
@@ -4530,49 +4674,121 @@ export default function App() {
                   )}
                 </label>
               </div>
-              <div className="work-form__grid">
-                <label
-                  className={`work-form__label${workFormFieldErrors.date ? ' work-form__label--error' : ''}`}
-                >
-                  Booking date
-                  <input
-                    className={`work-form__input${workFormFieldErrors.date ? ' work-form__input--error' : ''}`}
-                    type="date"
-                    min={todayDate}
-                    value={workForm.date}
-                    onChange={(event) =>
-                      updateWorkFormField('date', event.target.value)
-                    }
-                    required
-                  />
+              <div className="schedule-card">
+                <div className="schedule-card__header">
+                  <div className="schedule-card__title">Booking date</div>
+                  <div className="schedule-card__nav">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCalendarMonth(
+                          (prev) =>
+                            new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+                        )
+                      }
+                      aria-label="Previous month"
+                    >
+                      ‹
+                    </button>
+                    <span>{monthLabel}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCalendarMonth(
+                          (prev) =>
+                            new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+                        )
+                      }
+                      aria-label="Next month"
+                    >
+                      ›
+                    </button>
+                  </div>
+                </div>
+                <div className="schedule-calendar">
+                  <div className="schedule-calendar__weekdays">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
+                      (day) => (
+                        <span key={day}>{day}</span>
+                      )
+                    )}
+                  </div>
+                  <div className="schedule-calendar__grid">
+                    {calendarDays.map((day, index) => {
+                      const inMonth = day.getMonth() === calendarMonth.getMonth()
+                      const isPast = day < todayDateObj
+                      const value = formatDateValue(day)
+                      const isSelected = workForm.date === value
+                      const isToday = formatDateValue(day) === todayDate
+                      return (
+                        <button
+                          key={`${value}-${index}`}
+                          type="button"
+                          className={`schedule-day${
+                            inMonth ? '' : ' schedule-day--outside'
+                          }${isSelected ? ' schedule-day--selected' : ''}${
+                            isToday ? ' schedule-day--today' : ''
+                          }`}
+                          onClick={() => updateWorkFormField('date', value)}
+                          disabled={!inMonth || isPast}
+                        >
+                          {day.getDate()}
+                        </button>
+                      )
+                    })}
+                  </div>
                   {workFormFieldErrors.date && (
-                    <span className="work-form__hint">Required</span>
+                    <div className="schedule-card__error">Required</div>
                   )}
-                </label>
-                <label
-                  className={`work-form__label${workFormFieldErrors.time ? ' work-form__label--error' : ''}`}
-                >
-                  Time
-                  <input
-                    className={`work-form__input${workFormFieldErrors.time ? ' work-form__input--error' : ''}`}
-                    type="time"
-                    min={workForm.date === todayDate ? currentTime : undefined}
-                    value={workForm.time}
-                    onChange={(event) =>
-                      updateWorkFormField('time', event.target.value)
-                    }
-                    required
-                  />
+                </div>
+                <div className="schedule-times">
+                  <div className="schedule-times__header">
+                    <div className="schedule-times__label">{selectedDateLabel}</div>
+                    <div className="schedule-times__toggle">
+                      <button
+                        type="button"
+                        className={timeFormat === '12h' ? 'is-active' : ''}
+                        onClick={() => setTimeFormat('12h')}
+                      >
+                        12h
+                      </button>
+                      <button
+                        type="button"
+                        className={timeFormat === '24h' ? 'is-active' : ''}
+                        onClick={() => setTimeFormat('24h')}
+                      >
+                        24h
+                      </button>
+                    </div>
+                  </div>
+                  <div className="schedule-times__list">
+                    {timeSlots.map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        className={`schedule-time${
+                          workForm.time === slot ? ' is-active' : ''
+                        }`}
+                        onClick={() => updateWorkFormField('time', slot)}
+                      >
+                        {formatTimeLabel(slot)}
+                      </button>
+                    ))}
+                  </div>
                   {workFormFieldErrors.time && (
-                    <span className="work-form__hint">Required</span>
+                    <div className="schedule-card__error">Required</div>
                   )}
-                </label>
+                </div>
                 <label
-                  className={`work-form__label${workFormFieldErrors.timezone ? ' work-form__label--error' : ''}`}
+                  className={`work-form__label${
+                    workFormFieldErrors.timezone ? ' work-form__label--error' : ''
+                  }`}
                 >
                   Timezone
                   <select
-                    className={`work-form__input${workFormFieldErrors.timezone ? ' work-form__input--error' : ''}`}
+                    className={`work-form__input${
+                      workFormFieldErrors.timezone ? ' work-form__input--error' : ''
+                    }`}
                     value={workForm.timezone}
                     onChange={(event) =>
                       updateWorkFormField('timezone', event.target.value)
@@ -4592,12 +4808,20 @@ export default function App() {
                     <span className="work-form__hint">Required</span>
                   )}
                 </label>
+              </div>
+              <div className="work-form__grid">
                 <label
-                  className={`work-form__label${workFormFieldErrors.meeting_mode ? ' work-form__label--error' : ''}`}
+                  className={`work-form__label${
+                    workFormFieldErrors.meeting_mode ? ' work-form__label--error' : ''
+                  }`}
                 >
                   Mode of meeting
                   <select
-                    className={`work-form__input${workFormFieldErrors.meeting_mode ? ' work-form__input--error' : ''}`}
+                    className={`work-form__input${
+                      workFormFieldErrors.meeting_mode
+                        ? ' work-form__input--error'
+                        : ''
+                    }`}
                     value={workForm.meeting_mode}
                     onChange={(event) =>
                       updateWorkFormField('meeting_mode', event.target.value)

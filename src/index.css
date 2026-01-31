@@ -30,10 +30,15 @@
     overflow: hidden;
   }
 
-  body.has-custom-cursor,
-  body.has-custom-cursor * {
-    cursor: none;
-  }
+body.has-custom-cursor,
+body.has-custom-cursor * {
+  cursor: none;
+}
+}
+
+.font-title {
+  font-family: "Oswald", "Trebuchet MS", Arial, sans-serif;
+  letter-spacing: -2px;
 }
 
 .custom-cursor {
@@ -158,12 +163,14 @@
   inset: 0;
   background: linear-gradient(
     110deg,
-    rgba(255, 255, 255, 0) 20%,
-    rgba(255, 255, 255, 0.55) 45%,
-    rgba(255, 255, 255, 0) 70%
+    rgba(255, 255, 255, 0) 10%,
+    rgba(255, 255, 255, 0.12) 35%,
+    rgba(255, 255, 255, 0.32) 50%,
+    rgba(255, 255, 255, 0.12) 65%,
+    rgba(255, 255, 255, 0) 90%
   );
   transform: translateX(-120%);
-  animation: hero-shimmer 4s ease-in-out infinite;
+  animation: hero-shimmer 6s ease-in-out infinite;
   pointer-events: none;
   z-index: 2;
 }
@@ -193,6 +200,17 @@
   margin-left: auto;
   margin-right: auto;
   background: #f6f5f2;
+  color: #000000;
+}
+
+.portal-page--work .portal-page__meta {
+  color: #000000;
+  font-size: 0.85rem;
+}
+
+.portal-page--work .portal-page__title {
+  font-size: 2.4rem;
+  color: #000000;
 }
 
 .portal-page__header {
@@ -1071,11 +1089,12 @@
 }
 
 .hero-card__eyebrow {
-  margin: 6px 0 -10px;
+  margin: 6px 0 0;
   font-size: 2.6rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: -2px;
   text-transform: uppercase;
+  line-height: 0.92;
   color: var(--ink);
   background: transparent;
   border: 0;
@@ -1090,7 +1109,7 @@
 .hero-card__tagline {
   font-size: 1.1rem;
   font-weight: 400;
-  margin-top: 12px;
+  margin-top: 22px;
   margin-bottom: 10px;
 }
 
@@ -2314,10 +2333,10 @@
 .work-form__label {
   display: grid;
   gap: 6px;
-  font-size: 0.75rem;
+  font-size: 0.9rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--grey);
+  color: #000000;
 }
 
 .work-form__label input,
@@ -2325,12 +2344,17 @@
 .work-form__label textarea {
   border-radius: 0;
   border: 0;
-  border-bottom: 2px solid rgba(0, 0, 0, 0.18);
+  border-bottom: 0.7px solid #000000;
   padding: 10px 4px 8px;
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   letter-spacing: 0;
   text-transform: none;
   background: transparent;
+}
+
+.work-form__label input,
+.work-form__label select {
+  width: 85%;
 }
 
 .work-form__label--error {
@@ -2343,7 +2367,7 @@
 }
 
 .work-form__hint {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: #b22b2b;
@@ -2371,6 +2395,183 @@
   grid-column: 1 / -1;
 }
 
+.work-form__label--full + .work-form__grid {
+  margin-top: 20px;
+}
+
+.schedule-card {
+  margin-top: 20px;
+  padding: 20px;
+  background: #111111;
+  border-radius: 18px;
+  color: #ffffff;
+  display: grid;
+  gap: 16px;
+}
+
+.schedule-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.schedule-card__title {
+  font-size: 1rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.schedule-card__nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+
+.schedule-card__nav button {
+  border: 0;
+  background: #1f1f1f;
+  color: #ffffff;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.schedule-calendar__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 8px;
+}
+
+.schedule-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.schedule-day {
+  border: 0;
+  background: #2a2a2a;
+  color: #ffffff;
+  border-radius: 10px;
+  padding: 10px 0;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.schedule-day--outside {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.schedule-day--selected {
+  background: var(--accent);
+  color: #000000;
+  font-weight: 700;
+}
+
+.schedule-day--today {
+  outline: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.schedule-day:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.schedule-times {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-times__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.schedule-times__label {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.schedule-times__toggle {
+  display: inline-flex;
+  background: #1f1f1f;
+  border-radius: 999px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.schedule-times__toggle button {
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.schedule-times__toggle button.is-active {
+  background: #000000;
+}
+
+.schedule-times__list {
+  display: grid;
+  gap: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.schedule-time {
+  border: 1px solid #2f2f2f;
+  background: #151515;
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.schedule-time.is-active {
+  background: var(--accent);
+  color: #000000;
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.schedule-card__error {
+  font-size: 0.75rem;
+  color: #ff6b6b;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.schedule-card .work-form__label {
+  color: #ffffff;
+}
+
+.schedule-card .work-form__label input,
+.schedule-card .work-form__label select {
+  border-bottom-color: #ffffff;
+  color: #ffffff;
+}
+
+.schedule-card .work-form__label select option {
+  color: #000000;
+}
+
 .work-form__checkbox {
   grid-template-columns: auto 1fr;
   align-items: center;
@@ -2383,12 +2584,12 @@
 }
 
 .work-form__error {
-  font-size: 0.85rem;
+  font-size: 1rem;
   color: #b22b2b;
 }
 
 .work-form__status {
-  font-size: 0.85rem;
+  font-size: 1rem;
   color: #2f7a4c;
 }
 
@@ -2397,7 +2598,7 @@
   background: var(--accent);
   padding: 10px 16px;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.9rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   cursor: pointer;
