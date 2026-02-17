@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --paper: #1f1f1d;
+    --paper: #f9f6f0;
     --ink: #1b1b1b;
     --accent: #ffde00;
     --grey: #8f8f8f;
@@ -20,6 +20,7 @@
     @apply text-charcoal font-sans;
     background-color: var(--paper);
     background-image: none;
+    color: #1b1b1b;
     line-height: 1.55;
     overflow-x: hidden;
     overscroll-behavior-y: none;
@@ -38,7 +39,8 @@ body.has-custom-cursor * {
 
 .font-title {
   font-family: "Oswald", "Trebuchet MS", Arial, sans-serif;
-  letter-spacing: -2px;
+  letter-spacing: -1px;
+  line-height: calc(1em + 6px);
 }
 
 .custom-cursor {
@@ -77,7 +79,7 @@ body.has-custom-cursor * {
 }
 
 .custom-cursor.is-active {
-  background: #b9f5a1;
+  background: rgba(106, 0, 255, 0.7);
   transform: translate(var(--cursor-x), var(--cursor-y)) translate(-50%, -50%)
     scale(1.4);
 }
@@ -117,6 +119,64 @@ body.has-custom-cursor * {
   display: grid;
   gap: 32px;
   align-items: start;
+  background: #f9f6f0;
+  border-radius: 24px;
+  padding: 24px;
+  color: #1b1b1b;
+}
+
+.home-hero__panel,
+.home-hero__cards {
+  width: 100%;
+}
+
+.home-hero__cards {
+  background: #f7f7f7;
+  border-radius: 20px;
+  border: 0.5px solid rgba(27, 27, 27, 0.2);
+  padding: 18px 12px;
+  transition: opacity 0.25s ease, transform 0.35s ease;
+  transform-origin: right center;
+}
+
+.home-hero__cards.is-hidden {
+  opacity: 0;
+  transform: translateX(60px) scale(0.98);
+  max-height: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.home-hero--cards-hidden {
+  grid-template-columns: 1fr;
+}
+
+.home-hero--cards-hidden .home-hero__panel {
+  grid-column: 1 / -1;
+}
+
+.page-topbar__menu {
+  border: 1px solid rgba(27, 27, 27, 0.2);
+  background: #f7f7f7;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: "Oswald", "Trebuchet MS", Arial, sans-serif;
+  font-weight: 700;
+  position: relative;
+  z-index: 3;
+}
+
+.home-hero__panel {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
 }
 
 .home-hero .portal-grid {
@@ -137,6 +197,15 @@ body.has-custom-cursor * {
   text-align: left;
 }
 
+.home-hero__cards .portal-grid {
+  justify-items: center;
+}
+
+.home-hero__cards .portal-card {
+  width: 100%;
+  max-width: 380px;
+}
+
 @keyframes hero-bounce {
   0%,
   100% {
@@ -151,48 +220,50 @@ body.has-custom-cursor * {
   position: relative;
   border: none;
   border-radius: 22px;
-  background: #f6f5f2;
+  background: transparent;
   padding: 44px 28px 52px;
   box-shadow: none;
   overflow: hidden;
 }
 
-.hero-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    110deg,
-    rgba(255, 255, 255, 0) 10%,
-    rgba(255, 255, 255, 0.12) 35%,
-    rgba(255, 255, 255, 0.32) 50%,
-    rgba(255, 255, 255, 0.12) 65%,
-    rgba(255, 255, 255, 0) 90%
-  );
-  transform: translateX(-120%);
-  animation: hero-shimmer 6s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 2;
-}
-
 .page--light {
-  background: #ffffff;
+  background: var(--paper);
   min-height: 100vh;
   width: 100%;
 }
 
+.page--light :is(
+  .home-hero,
+  .home-about,
+  .portal-page,
+  .portal-card,
+  .service-item,
+  .service-tab,
+  .portfolio-hero,
+  .portfolio-card,
+  .portfolio-project,
+  .kit-section,
+  .shop-section,
+  .shop-card
+) {
+  color: #1b1b1b;
+}
+
 .portal-page {
   margin-top: 28px;
-  background: #ffffff;
+  background: #f9f6f0;
   border-radius: 22px;
   padding: 28px;
   min-height: min(100vh, 100dvh);
   display: flex;
   flex-direction: column;
+  color: #1b1b1b;
 }
 
 .portal-page--services {
   height: auto;
+  background: #f9f6f0;
+  color: #1b1b1b;
 }
 
 .portal-page--work {
@@ -262,7 +333,7 @@ body.has-custom-cursor * {
 
 .page-header {
   position: relative;
-  padding: 12px 0 4px;
+  padding: 32px 0 4px;
   margin-bottom: 2px;
   min-height: 72px;
 }
@@ -279,9 +350,9 @@ body.has-custom-cursor * {
 
 .page-topbar__logo {
   position: absolute;
-  left: 50%;
+  left: 0;
   top: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(0, -50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -289,7 +360,7 @@ body.has-custom-cursor * {
 }
 
 .page-topbar__logo img {
-  height: 72px;
+  height: 48px;
   width: auto;
   display: block;
 }
@@ -524,7 +595,7 @@ body.has-custom-cursor * {
 }
 
 .portal-page--portfolio {
-  background: #ffffff;
+  background: #f9f6f0;
 }
 
 .portfolio {
@@ -879,7 +950,7 @@ body.has-custom-cursor * {
 }
 
 .portfolio-card {
-  padding: 14px 0 0;
+  padding: 14px 0;
   border-radius: 0;
   background: transparent;
   border: 0;
@@ -887,7 +958,7 @@ body.has-custom-cursor * {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  border-top: 0.5px solid rgba(0, 0, 0, 0.2);
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.2);
 }
 
 .portfolio-card__value {
@@ -990,7 +1061,8 @@ body.has-custom-cursor * {
   padding: 18px;
   border-radius: 16px;
   background: transparent;
-  border: 0.5px solid rgba(0, 0, 0, 0.15);
+  border: 0;
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.15);
   display: grid;
   gap: 8px;
   box-shadow: none;
@@ -1078,11 +1150,28 @@ body.has-custom-cursor * {
   z-index: 1;
 }
 
+.hero-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0) 10%,
+    rgba(255, 255, 255, 0.12) 35%,
+    rgba(255, 255, 255, 0.32) 50%,
+    rgba(255, 255, 255, 0.12) 65%,
+    rgba(255, 255, 255, 0) 90%
+  );
+  transform: translateX(-120%);
+  animation: hero-shimmer 6s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+
 @keyframes hero-shimmer {
   0% {
     transform: translateX(-120%);
   }
-  60%,
   100% {
     transform: translateX(120%);
   }
@@ -1188,16 +1277,7 @@ body.has-custom-cursor * {
 }
 
 .hero__confetti {
-  position: absolute;
-  inset: 0;
-  opacity: 0.5;
-  background-image:
-    radial-gradient(circle, rgba(255, 255, 255, 0.6) 0 6px, transparent 7px),
-    radial-gradient(circle, rgba(255, 255, 255, 0.7) 0 4px, transparent 5px),
-    radial-gradient(circle, rgba(255, 255, 255, 0.5) 0 3px, transparent 4px);
-  background-position: 12px 18px, 68px 52px, 120px 14px;
-  background-size: 140px 140px;
-  pointer-events: none;
+  display: none;
 }
 
 .portal-grid {
@@ -1230,27 +1310,20 @@ body.has-custom-cursor * {
 }
 
 .home-section__title--scribble::after {
-  content: '';
-  position: absolute;
-  left: -6px;
-  right: -6px;
-  bottom: 2px;
-  height: 10px;
-  border-radius: 999px;
-  background: #f5d34a;
-  background-image: repeating-linear-gradient(
-    -6deg,
-    rgba(245, 211, 74, 0.9) 0 6px,
-    rgba(245, 211, 74, 0.6) 6px 10px
-  );
-  transform: rotate(-2deg);
-  z-index: -1;
+  display: none;
 }
 
 .home-section__subtitle {
   margin: 0;
   color: rgba(27, 27, 27, 0.68);
   max-width: 640px;
+}
+
+.home-about {
+  background: #f9f6f0;
+  border-radius: 24px;
+  padding: 24px;
+  color: #1b1b1b;
 }
 
 .home-about__grid {
@@ -1386,30 +1459,161 @@ body.has-custom-cursor * {
   }
 
   .home-hero {
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.65fr);
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.55fr);
     gap: 48px;
+  }
+
+  .home-hero .portal-grid {
+    margin-top: 32px;
   }
 
   .hero-rail {
     padding-left: 28px;
-    border-left: 0.5px solid rgba(0, 0, 0, 0.08);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding-bottom: 0 !important;
+    padding-top: 30px !important;
+  }
+
+  .home-hero {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    outline: none;
+    outline-offset: 0;
+    position: relative;
+    min-height: 0;
+  }
+
+  .home-hero__cards {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    top: 44px;
+    bottom: 32px;
+    z-index: 2;
+    transition: transform 0.35s ease, opacity 0.25s ease;
+    background: #f7f7f7;
+    border-radius: 20px;
+    padding: 18px 12px;
+    overflow-y: auto;
+    max-height: calc(100vh - 120px);
+  }
+
+  .home-hero__cards.is-hidden {
+    transform: translateX(120%);
+    opacity: 0;
+    max-height: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .home-hero__cards .hero-rail {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .home-hero__cards .portal-grid {
+    margin-top: 0;
+  }
+
+  .portal-card {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .home-about {
+    outline: none;
+    outline-offset: 0;
+  }
+
+  .portal-card__media {
+    width: 88px;
+    height: 88px;
   }
 }
 
 .portal-card {
   position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
   padding: 22px 22px 20px;
-  border: none;
-  border-bottom: 0.5px solid rgba(0, 0, 0, 0.18);
-  border-radius: 0;
-  background: transparent;
+  border: 0;
+  border-bottom: 0.5px solid rgba(27, 27, 27, 0.25);
+  border-radius: 8px;
+  background: #f7f7f7;
+  color: #1b1b1b;
   box-shadow: none;
   overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
   animation: hero-bounce 3.6s ease-in-out infinite;
+}
+
+.portal-card:hover {
+  transform: scale(1.02);
+}
+
+.portal-card:active {
+  transform: scale(1.01);
+}
+
+
+.portal-card__link {
+  color: inherit;
+  text-decoration: none;
+  display: block;
+}
+
+.portal-card--button {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  color: inherit;
+  border: none;
+  font: inherit;
+  appearance: none;
+}
+
+.portal-card__link .portal-card__title {
+  border-bottom: 0;
+  padding-bottom: 0;
+  display: inline-block;
+}
+
+.portal-card__link:hover {
+  opacity: 0.85;
+}
+
+.portal-card__link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.portal-card__text {
+  display: grid;
+  gap: 10px;
+}
+
+.portal-card__media {
+  flex-shrink: 0;
+  width: 120px;
+  height: 120px;
+}
+
+.portal-card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 16px;
 }
 
 .portal-card__meta {
@@ -1418,13 +1622,13 @@ body.has-custom-cursor * {
   text-transform: uppercase;
   color: var(--grey);
   font-weight: 700;
-  text-align: center;
+  text-align: left;
 }
 
 .portal-card__title {
   font-size: 1.7rem;
   font-weight: 500;
-  text-align: center;
+  text-align: left;
 }
 
 .portal-card__glow {
@@ -1525,6 +1729,7 @@ body.has-custom-cursor * {
   border-radius: 14px;
   background: #f7f7f7;
   padding: 12px 14px;
+  border-bottom: 0.5px solid rgba(27, 27, 27, 0.2);
 }
 
 .service-panel {
@@ -1873,11 +2078,33 @@ body.has-custom-cursor * {
   gap: 16px;
 }
 
+.kit-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.kit-tab {
+  border: 0;
+  background: #f1f1f1;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.kit-tab.is-active {
+  background: var(--accent);
+}
+
 .kit-section {
   background: transparent;
   border-radius: 14px;
   padding: 12px 14px;
-  border: 0.5px solid rgba(0, 0, 0, 0.15);
+  border: 0;
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.15);
 }
 
 .kit-title {
@@ -2121,7 +2348,8 @@ body.has-custom-cursor * {
   padding: 16px;
   display: grid;
   gap: 8px;
-  border: 0.5px solid rgba(0, 0, 0, 0.15);
+  border: 0;
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.15);
   box-shadow: none;
 }
 
@@ -2649,20 +2877,6 @@ body.has-custom-cursor * {
   }
 }
 
-.portal-card:hover {
-  transform: translateY(-2px);
-  box-shadow: none;
-}
-
-.portal-card:hover .portal-card__glow {
-  opacity: 0.9;
-  transform: translate(10px, 10px);
-}
-
-.portal-card:active {
-  transform: translateY(0);
-  box-shadow: none;
-}
 
 .portal-card:focus-visible {
   outline: 3px solid var(--accent);
@@ -2675,6 +2889,7 @@ body.has-custom-cursor * {
   border: 0;
   border-radius: 20px;
   background: #ffffff;
+  color: #1b1b1b;
   position: relative;
   overflow: hidden;
 }
@@ -2929,6 +3144,7 @@ body.has-custom-cursor * {
   opacity: 1;
   transform: translateY(0);
 }
+
 
 @media (min-width: 640px) {
   .hero-card {

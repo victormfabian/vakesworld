@@ -105,6 +105,7 @@ export default function App() {
   const [activeShopItem, setActiveShopItem] = useState(null)
   const [activeShopSize, setActiveShopSize] = useState('')
   const [activeCurrency, setActiveCurrency] = useState('NGN')
+  const [activeSuccessKitTab, setActiveSuccessKitTab] = useState('all')
   const [aboutModalOpen, setAboutModalOpen] = useState(false)
   const [activeServiceTab, setActiveServiceTab] = useState('all')
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -146,6 +147,8 @@ export default function App() {
   const [workFormFieldErrors, setWorkFormFieldErrors] = useState({})
   const [workFormContext, setWorkFormContext] = useState('portal')
   const [portfolioCallOpen, setPortfolioCallOpen] = useState(false)
+  const [workModalOpen, setWorkModalOpen] = useState(false)
+  const [cardsVisible, setCardsVisible] = useState(false)
   const [resumeOpen, setResumeOpen] = useState(false)
   const [activeNavCardIndex, setActiveNavCardIndex] = useState(0)
   const [currentTime, setCurrentTime] = useState(
@@ -272,6 +275,28 @@ export default function App() {
     return `${adjusted}:${minuteText} ${period}`
   }
 
+  const getPortalIllustration = (portal) => {
+    if (portal?.illustration_url) {
+      return portal.illustration_url
+    }
+    if (isSuccessKitPortal(portal)) {
+      return 'https://placehold.co/140x140/png?text=Kit'
+    }
+    if (isShopPortal(portal)) {
+      return 'https://placehold.co/140x140/png?text=Shop'
+    }
+    if (isWorkWithMePortal(portal)) {
+      return 'https://placehold.co/140x140/png?text=Work'
+    }
+    if (isServicesPortal(portal)) {
+      return 'https://placehold.co/140x140/png?text=Services'
+    }
+    if (isPortfolioPortal(portal)) {
+      return 'https://placehold.co/140x140/png?text=Portfolio'
+    }
+    return 'https://placehold.co/140x140/png?text=Idea'
+  }
+
   const getServiceKey = (service, index) =>
     slugify(service?.title) || `service-${index + 1}`
 
@@ -321,10 +346,14 @@ export default function App() {
     ? portalRoutes.find((item) => item.slug === routeSlug) || null
     : null
   const activeContentPortal = routePortal?.portal || null
+  const isAboutRoute = routeSlug === 'about'
   const isPortfolioRoute = routeSlug === 'victormfabian'
   const isPortfolioView =
     isPortfolioRoute || (routePortal && isPortfolioPortal(routePortal.portal))
   const portalsForRail = orderPortalsForHome(portals)
+  const workPortalEntry = portalRoutes.find((item) =>
+    isWorkWithMePortal(item.portal)
+  )
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -392,27 +421,33 @@ export default function App() {
     if (!mergedSite.dribbble_url && mergedSite.about_section?.dribbble_url) {
       mergedSite.dribbble_url = mergedSite.about_section.dribbble_url
     }
-      const mergedPortals = portalData?.length
-        ? portalData.map((portal) => {
-            const defaultMatch = DEFAULT_PORTALS.find(
-              (item) => item.meta === portal.meta || item.title === portal.title
-            )
-            let nextPortal = portal
-            if (!portal.services && defaultMatch?.services) {
-              nextPortal = { ...nextPortal, services: defaultMatch.services }
+    const mergedPortals = portalData?.length
+      ? portalData.map((portal) => {
+          const defaultMatch = DEFAULT_PORTALS.find(
+            (item) => item.meta === portal.meta || item.title === portal.title
+          )
+          let nextPortal = portal
+          if (!portal.services && defaultMatch?.services) {
+            nextPortal = { ...nextPortal, services: defaultMatch.services }
+          }
+          if (!portal.success_kit && isSuccessKitPortal(portal)) {
+            nextPortal = { ...nextPortal, success_kit: DEFAULT_SUCCESS_KIT }
+          }
+          if (!portal.shop && defaultMatch?.shop) {
+            nextPortal = { ...nextPortal, shop: defaultMatch.shop }
+          }
+          if (!portal.work_form && defaultMatch?.work_form) {
+            nextPortal = { ...nextPortal, work_form: defaultMatch.work_form }
+          }
+          if (!portal.illustration_url && defaultMatch?.illustration_url) {
+            nextPortal = {
+              ...nextPortal,
+              illustration_url: defaultMatch.illustration_url,
             }
-            if (!portal.success_kit && isSuccessKitPortal(portal)) {
-              nextPortal = { ...nextPortal, success_kit: DEFAULT_SUCCESS_KIT }
-            }
-            if (!portal.shop && defaultMatch?.shop) {
-              nextPortal = { ...nextPortal, shop: defaultMatch.shop }
-            }
-            if (!portal.work_form && defaultMatch?.work_form) {
-              nextPortal = { ...nextPortal, work_form: defaultMatch.work_form }
-            }
-            return nextPortal
-          })
-        : DEFAULT_PORTALS
+          }
+          return nextPortal
+        })
+      : DEFAULT_PORTALS
 
       const orderedPortals = orderPortals(mergedPortals)
       setSite(mergedSite)
@@ -473,7 +508,7 @@ export default function App() {
         return
       }
       const isClickable = target.closest(
-        'a, button, input, textarea, select, [role="button"], .portal-card, .shop-card'
+        'a, button, input, textarea, select, [role="button"], .portal-card__title-link, .shop-card'
       )
       setCursorActive(Boolean(isClickable))
     }
@@ -570,10 +605,11 @@ export default function App() {
     }
 
     const portfolioProfile = getPortfolioSection(site)
-    const pageLabel =
-      routePortal?.portal?.meta ||
-      routePortal?.portal?.title ||
-      (isPortfolioRoute ? portfolioProfile.name : '')
+    const pageLabel = isAboutRoute
+      ? 'About'
+      : routePortal?.portal?.meta ||
+        routePortal?.portal?.title ||
+        (isPortfolioRoute ? portfolioProfile.name : '')
     const siteName = 'VAKES'
     const heroLine =
       site?.hero_tagline || site?.hero_subline || 'Creative systems and culture.'
@@ -581,7 +617,7 @@ export default function App() {
     const portfolioDescription = `${portfolioProfile.title}. ${portfolioProfile.summary}`
     const pageDescription = pageLabel
       ? [
-          routePortal?.portal?.title,
+          isAboutRoute ? aboutSection?.bio : routePortal?.portal?.title,
           isPortfolioRoute ? portfolioDescription : heroLine,
         ]
           .filter(Boolean)
@@ -774,7 +810,7 @@ export default function App() {
   const SHOP_TABS = [
     { key: 'all', label: 'All' },
     { key: 'art', label: 'Art' },
-    { key: 'clothing', label: 'Clothing' },
+    { key: 'apparel', label: 'Apparel' },
     { key: 'accessories', label: 'Accessories' },
   ]
 
@@ -1084,6 +1120,7 @@ export default function App() {
       meta: portal.meta,
       title: portal.title,
       href: portal.href || '#',
+      illustration_url: portal.illustration_url || '',
       sort_order: index + 1,
       services: portal.services || null,
       success_kit: portal.success_kit || null,
@@ -1091,9 +1128,24 @@ export default function App() {
       work_form: portal.work_form || null,
     }))
 
-    const { error: portalError } = await supabase
+    let { error: portalError } = await supabase
       .from('portals')
       .upsert(portalPayload, { onConflict: 'id' })
+
+    if (portalError && portalError.message.includes('illustration_url')) {
+      const fallbackPayload = portalPayload.map(
+        ({ illustration_url, ...rest }) => rest
+      )
+      const fallbackResult = await supabase
+        .from('portals')
+        .upsert(fallbackPayload, { onConflict: 'id' })
+      portalError = fallbackResult.error
+      if (!portalError) {
+        setStatus(
+          'Saved without illustration_url column. Add it to portals table to store images.'
+        )
+      }
+    }
 
     if (portalError) {
       setError(portalError.message)
@@ -1836,11 +1888,6 @@ export default function App() {
       <div className="portfolio">
         <div className="portfolio-mobile">
           <div className="portfolio-mobile__header">
-            {profile.image_url ? (
-              <div className="portfolio-mobile__avatar">
-                <img src={profile.image_url} alt={profile.name} />
-              </div>
-            ) : null}
             <div>
               <p className="portfolio-mobile__name">{profile.name}</p>
               <p className="portfolio-mobile__title">{profile.title}</p>
@@ -1936,11 +1983,6 @@ export default function App() {
             <div className="portfolio-hero">
               <div className="portfolio-hero__primary">
                 <div className="portfolio-hero__top">
-                  {profile.image_url ? (
-                    <div className="portfolio-hero__avatar">
-                      <img src={profile.image_url} alt={profile.name} />
-                    </div>
-                  ) : null}
                   <div className="portfolio-hero__identity">
                     <p className="portfolio-hero__kicker">Profile</p>
                     <p className="portfolio-hero__title">{profile.title}</p>
@@ -2017,15 +2059,6 @@ export default function App() {
             <div className="portfolio-highlights">
               {profile.highlights.map((item) => (
                 <div className="portfolio-card" key={item.label}>
-                  <div className="portfolio-card__icon-wrap">
-                    {item.icon_url ? (
-                      <img
-                        className="portfolio-card__icon"
-                        src={item.icon_url}
-                        alt=""
-                      />
-                    ) : null}
-                  </div>
                   <div className="portfolio-card__text">
                     <div className="portfolio-card__value">{item.value}</div>
                     <div className="portfolio-card__label">{item.label}</div>
@@ -2061,36 +2094,14 @@ export default function App() {
             <p>Strategy, analytics, and digital systems that move metrics.</p>
           </div>
           <div className="portfolio-projects__grid">
-            {profile.projects.map((project) => {
-              const mediaUrl = project.media_url || ''
-              const mediaType = project.media_type || 'image'
-              const youtubeUrl =
-                mediaType === 'youtube' ? getYouTubeEmbedUrl(mediaUrl) : ''
-              return (
-                <article className="portfolio-project" key={project.title}>
-                  {mediaUrl && (
-                    <div className="portfolio-project__media">
-                      {youtubeUrl ? (
-                        <iframe
-                          src={youtubeUrl}
-                          title={project.title}
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        ></iframe>
-                      ) : mediaType === 'video' || isVideoUrl(mediaUrl) ? (
-                        <video src={mediaUrl} controls playsInline />
-                      ) : (
-                        <img src={mediaUrl} alt={project.title} />
-                      )}
-                    </div>
-                  )}
-                  <h4>{project.title}</h4>
-                  <p>{project.description}</p>
-                  <div className="portfolio-project__impact">{project.impact}</div>
-                  <div className="portfolio-project__stack">{project.stack}</div>
-                </article>
-              )
-            })}
+            {profile.projects.map((project) => (
+              <article className="portfolio-project" key={project.title}>
+                <h4>{project.title}</h4>
+                <p>{project.description}</p>
+                <div className="portfolio-project__impact">{project.impact}</div>
+                <div className="portfolio-project__stack">{project.stack}</div>
+              </article>
+            ))}
           </div>
         </div>
 
@@ -2132,7 +2143,23 @@ export default function App() {
     <>
       {isSuccessKitPortal(portal) && (
         <div className="kit-sections">
-          {SUCCESS_KIT_SECTIONS.map((section) => {
+          <div className="kit-tabs" role="tablist" aria-label="Success kit tabs">
+            {[{ key: 'all', label: 'All' }, ...SUCCESS_KIT_SECTIONS].map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                className={`kit-tab${activeSuccessKitTab === tab.key ? ' is-active' : ''}`}
+                onClick={() => setActiveSuccessKitTab(tab.key)}
+                role="tab"
+                aria-selected={activeSuccessKitTab === tab.key}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {SUCCESS_KIT_SECTIONS.filter((section) =>
+            activeSuccessKitTab === 'all' ? true : section.key === activeSuccessKitTab
+          ).map((section) => {
             const items = getSuccessKit(portal)[section.key] || []
             return (
               <div className="kit-section" key={section.key}>
@@ -2209,21 +2236,6 @@ export default function App() {
                 )
                 .map((item, itemIndex) => (
                   <div className="shop-card" key={`${item.title}-${itemIndex}`}>
-                    <div className="shop-card__media">
-                      {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.title}
-                          onContextMenu={preventContextMenu}
-                          onDragStart={preventDragStart}
-                          onCopy={preventCopy}
-                          onCut={preventCopy}
-                          draggable={false}
-                        />
-                      ) : (
-                        <div className="shop-card__placeholder">Image</div>
-                      )}
-                    </div>
                     <div className="shop-card__title">{item.title}</div>
                     <div className="shop-card__price">
                       {formatCurrencyAmount(
@@ -3492,6 +3504,20 @@ export default function App() {
                             }
                           />
                         </label>
+                        <label className="admin__label admin__label--full">
+                          Illustration URL
+                          <input
+                            className="admin__input"
+                            value={portal.illustration_url || ''}
+                            onChange={(event) =>
+                              handlePortalChange(
+                                portalIndex,
+                                'illustration_url',
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
                       </div>
                       {isServicesPortal(portal) && (
                         <div className="admin__services">
@@ -3939,7 +3965,7 @@ export default function App() {
                                       }
                                     >
                                       <option value="art">Art</option>
-                                      <option value="clothing">Clothing</option>
+                                      <option value="apparel">Apparel</option>
                                       <option value="accessories">Accessories</option>
                                     </select>
                                   </label>
@@ -4233,6 +4259,127 @@ export default function App() {
     )
   }
 
+  const renderAboutSection = (showTitle = true) => (
+    <section className="home-about">
+      {showTitle && (
+        <div className="home-section__header">
+          <h2 className="home-section__title home-section__title--scribble font-title">
+            About VAKES
+          </h2>
+        </div>
+      )}
+      <div className="home-about__grid">
+        {aboutSection.image_url ? (
+          <div className="home-about__media">
+            <img
+              src={aboutSection.image_url}
+              alt="VAKES studio"
+              onContextMenu={preventContextMenu}
+              onDragStart={preventDragStart}
+              onCopy={preventCopy}
+              onCut={preventCopy}
+              draggable={false}
+            />
+          </div>
+        ) : null}
+        <div className="home-about__content">
+          <p className="home-about__bio">{aboutSection.bio}</p>
+          <div className="home-about__meta">
+            <div>
+              <p className="home-about__label">Team</p>
+              <ul>
+                {(aboutSection.team || []).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="home-about__label">Partners</p>
+              <ul>
+                {(aboutSection.partners || []).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          {(aboutSection.blog_links || []).length > 0 && (
+            <div className="home-about__links">
+              <p className="home-about__label">Journal</p>
+              <ul>
+                {aboutSection.blog_links.map((link) => (
+                  <li key={link}>
+                    <a href={link} target="_blank" rel="noreferrer">
+                      {link}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="home-about__socials">
+            <p className="home-about__label">Socials</p>
+            <ul>
+              {site.instagram_url && (
+                <li>
+                  <a href={site.instagram_url} target="_blank" rel="noreferrer">
+                    <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                      <path d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H7zm5 3.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6zm0 1.8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm4.6-.7a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z" />
+                    </svg>
+                    Instagram
+                  </a>
+                </li>
+              )}
+              {site.tiktok_url && (
+                <li>
+                  <a href={site.tiktok_url} target="_blank" rel="noreferrer">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M14 3a6.2 6.2 0 0 0 4.4 1.8V7a7.9 7.9 0 0 1-4.4-1.4v7.2a5.8 5.8 0 1 1-5-5.7v2.3a3.5 3.5 0 1 0 2.7 3.4V3h2.3z" />
+                    </svg>
+                    TikTok
+                  </a>
+                </li>
+              )}
+              {site.youtube_url && (
+                <li>
+                  <a href={site.youtube_url} target="_blank" rel="noreferrer">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C17.9 5 12 5 12 5s-5.9 0-7.7.3a2.7 2.7 0 0 0-1.9 1.9A28.5 28.5 0 0 0 2 12a28.5 28.5 0 0 0 .4 4.8 2.7 2.7 0 0 0 1.9 1.9c1.8.3 7.7.3 7.7.3s5.9 0 7.7-.3a2.7 2.7 0 0 0 1.9-1.9A28.5 28.5 0 0 0 22 12a28.5 28.5 0 0 0-.4-4.8zM10 15.4V8.6L15.6 12 10 15.4z" />
+                    </svg>
+                    YouTube
+                  </a>
+                </li>
+              )}
+              {behanceUrl && (
+                <li>
+                  <a href={behanceUrl} target="_blank" rel="noreferrer">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M8.8 11.4c1.5-.1 2.6-1 2.6-2.6 0-2-1.4-3-4-3H2v12h5.7c2.8 0 4.6-1.2 4.6-3.6 0-2-1.2-3.1-2.5-3.4zM4.4 7.6h2.6c1.1 0 1.8.4 1.8 1.4 0 1.1-.7 1.5-1.9 1.5H4.4V7.6zm2.8 8.2H4.4v-3.4h2.9c1.3 0 2.2.6 2.2 1.7 0 1.3-.9 1.7-2.2 1.7zM19.1 9.2c-2.3 0-4 1.6-4 4.3 0 2.8 1.6 4.4 4.2 4.4 2 0 3.3-1 3.7-2.6h-2c-.2.5-.7.9-1.7.9-1.2 0-1.9-.7-2-2h5.9c.1-2.9-1.3-5-4.1-5zm-2 3.4c.1-1 .8-1.7 1.9-1.7 1.1 0 1.7.6 1.8 1.7h-3.7zM16.6 6.5h4.8V5.2h-4.8v1.3z" />
+                    </svg>
+                    Behance
+                  </a>
+                </li>
+              )}
+              {dribbbleUrl && (
+                <li>
+                  <a href={dribbbleUrl} target="_blank" rel="noreferrer">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm6.5 5.3a8.3 8.3 0 0 1 1.8 4.7 14.5 14.5 0 0 0-6-.1c-.2-.5-.4-.9-.6-1.4a10.7 10.7 0 0 0 4.8-3.2ZM12 3.8a8.1 8.1 0 0 1 5.2 1.9 9.2 9.2 0 0 1-4.4 2.8A36.9 36.9 0 0 0 9.6 4a8.2 8.2 0 0 1 2.4-.2Zm-4.2 1a35.5 35.5 0 0 1 3.2 4.4A30.8 30.8 0 0 1 3.8 10 8.3 8.3 0 0 1 7.8 4.8ZM3.7 12a8.7 8.7 0 0 1 .1-1.3 33.6 33.6 0 0 0 8.1-1.1c.2.4.4.8.6 1.2a13.7 13.7 0 0 0-5.7 6.6A8.3 8.3 0 0 1 3.7 12Zm8.3 8.3a8.1 8.1 0 0 1-4.2-1.2 11.8 11.8 0 0 1 5.3-6.1 24.6 24.6 0 0 1 1.4 5.3 8.1 8.1 0 0 1-2.5 2Zm4-.9a26.3 26.3 0 0 0-1.2-4.7 12.7 12.7 0 0 1 5 .2 8.3 8.3 0 0 1-3.8 4.5Z" />
+                    </svg>
+                    Dribbble
+                  </a>
+                </li>
+              )}
+            </ul>
+          </div>
+          <div className="home-about__contact">
+            <a href={`mailto:${aboutSection.email}`}>{aboutSection.email}</a>
+            <span>{aboutSection.phone}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+
   return (
     <div
       className="page page--light mx-auto max-w-none px-5 pb-10 pt-6 sm:px-6 sm:pb-16 sm:pt-8 lg:px-16 xl:px-20"
@@ -4244,6 +4391,15 @@ export default function App() {
               <div className="page-topbar__logo">
                 <img src={headerLogoUrl} alt="VAKES" />
               </div>
+            )}
+            {!routePortal && !isPortfolioRoute && !isAboutRoute && (
+              <button
+                type="button"
+                className="page-topbar__menu"
+                onClick={() => setCardsVisible((prev) => !prev)}
+              >
+                {cardsVisible ? '✕ Close' : '☰ Menu'}
+              </button>
             )}
             {routePortal && (
               <Link
@@ -4271,242 +4427,142 @@ export default function App() {
           </a>
         </div>
       )}
-      {!routePortal && !isPortfolioRoute && (
+      {!routePortal && !isPortfolioRoute && !isAboutRoute && (
         <div className="home-layout">
-          <section className="home-hero">
-            <div className="hero-wrap">
-              <header className="hero-card">
-                <div className="hero-card__inner flex flex-col items-center text-center">
-                <h1 className="hero-card__eyebrow font-title">
-                  {site.hero_eyebrow}
-                </h1>
-                <p className="hero-card__tagline">{site.hero_tagline}</p>
-                {heroMediaUrl ? (
-                  <div className="hero-media mt-4">
-                    {getYouTubeEmbedUrl(heroMediaUrl) ? (
-                    <div
-                      className="hero-video"
-                      onContextMenu={preventContextMenu}
-                      onCopy={preventCopy}
-                      onCut={preventCopy}
-                    >
-                      <iframe
-                        src={getYouTubeEmbedUrl(heroMediaUrl)}
-                        title="VAKES"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      ></iframe>
-                    </div>
-                  ) : isVideoUrl(heroMediaUrl) ? (
-                    <video
-                      className="hero-logo"
-                      src={heroMediaUrl}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      controlsList="nodownload noplaybackrate noremoteplayback"
-                      disablePictureInPicture
-                      disableRemotePlayback
-                      onContextMenu={preventContextMenu}
-                      onCopy={preventCopy}
-                      onCut={preventCopy}
-                    />
-                  ) : (
-                    <div>
-                      <img
-                        src={heroMediaUrl}
-                        alt="VAKES"
-                        className="hero-logo"
+          <section className={`home-hero${cardsVisible ? '' : ' home-hero--cards-hidden'}`}>
+            <div className="home-hero__panel">
+              <div className="hero-wrap">
+                <header className="hero-card">
+                  <div className="hero-card__inner flex flex-col items-center text-center">
+                  <h1 className="hero-card__eyebrow font-title">
+                    {site.hero_eyebrow}
+                  </h1>
+                  <p className="hero-card__tagline">{site.hero_tagline}</p>
+                  {heroMediaUrl ? (
+                    <div className="hero-media mt-4">
+                      {getYouTubeEmbedUrl(heroMediaUrl) ? (
+                      <div
+                        className="hero-video"
                         onContextMenu={preventContextMenu}
-                        onDragStart={preventDragStart}
                         onCopy={preventCopy}
                         onCut={preventCopy}
-                        draggable={false}
+                      >
+                        <iframe
+                          src={getYouTubeEmbedUrl(heroMediaUrl)}
+                          title="VAKES"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        ></iframe>
+                      </div>
+                    ) : isVideoUrl(heroMediaUrl) ? (
+                      <video
+                        className="hero-logo"
+                        src={heroMediaUrl}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        controlsList="nodownload noplaybackrate noremoteplayback"
+                        disablePictureInPicture
+                        disableRemotePlayback
+                        onContextMenu={preventContextMenu}
+                        onCopy={preventCopy}
+                        onCut={preventCopy}
                       />
-                    </div>
-                  )}
+                    ) : (
+                      <div>
+                        <img
+                          src={heroMediaUrl}
+                          alt="VAKES"
+                          className="hero-logo"
+                          onContextMenu={preventContextMenu}
+                          onDragStart={preventDragStart}
+                          onCopy={preventCopy}
+                          onCut={preventCopy}
+                          draggable={false}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  ) : null}
+                  <p className="hero-card__subline">{site.hero_subline}</p>
                 </div>
-                ) : null}
-                <p className="hero-card__subline">{site.hero_subline}</p>
+                <div className="hero__confetti" aria-hidden="true"></div>
+                </header>
               </div>
-              <div className="hero__confetti" aria-hidden="true"></div>
-              </header>
             </div>
-            <aside className="hero-rail">
-              <nav className="portal-grid mt-6 sm:mt-8" aria-label="Primary">
-                {portalsForRail.map((portal, index) => {
-                  const route = portalRoutes.find((item) => item.portal === portal)
-                  const content = (
-                    <>
-                      <div className="portal-card__meta">{portal.meta}</div>
-                      <h2 className="portal-card__title font-title">
-                        {portal.title}
-                      </h2>
-                      <span className="portal-card__glow" aria-hidden="true"></span>
-                    </>
-                  )
+            <div className={`home-hero__cards${cardsVisible ? ' is-visible' : ' is-hidden'}`}>
+              <aside className="hero-rail">
+                <nav className="portal-grid mt-6 sm:mt-8" aria-label="Primary">
+                  {portalsForRail.map((portal, index) => {
+                    const route = portalRoutes.find((item) => item.portal === portal)
+                    const content = (
+                      <>
+                        <div className="portal-card__text">
+                          <div className="portal-card__meta">{portal.meta}</div>
+                          <h2 className="portal-card__title font-title">
+                            {portal.title}
+                          </h2>
+                        </div>
+                        <span className="portal-card__glow" aria-hidden="true"></span>
+                      </>
+                    )
 
-                  if (portal.href && portal.href !== '#') {
+                    if (isWorkWithMePortal(portal)) {
+                      return (
+                        <button
+                          key={portal.id ?? portal.meta ?? index}
+                          type="button"
+                          data-animate
+                          className="reveal portal-card portal-card--button"
+                          onClick={() => {
+                            setWorkFormContext('portal')
+                            setWorkFormError('')
+                            setWorkFormStatus('')
+                            setWorkFormFieldErrors({})
+                            setWorkModalOpen(true)
+                          }}
+                        >
+                          {content}
+                        </button>
+                      )
+                    }
+
+                    if (portal.href && portal.href !== '#') {
+                      return (
+                        <a
+                          key={portal.id ?? portal.meta ?? index}
+                          data-animate
+                          href={portal.href}
+                          className="reveal portal-card"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {content}
+                        </a>
+                      )
+                    }
+
                     return (
-                      <a
+                      <Link
                         key={portal.id ?? portal.meta ?? index}
                         data-animate
-                        href={portal.href}
+                        to={route?.path || '/'}
                         className="reveal portal-card"
-                        target="_blank"
-                        rel="noreferrer"
                       >
                         {content}
-                      </a>
+                      </Link>
                     )
-                  }
-
-                  return (
-                    <Link
-                      key={portal.id ?? portal.meta ?? index}
-                      data-animate
-                      to={route?.path || '/'}
-                      className="reveal portal-card"
-                    >
-                      {content}
-                    </Link>
-                  )
-                })}
-              </nav>
-            </aside>
-          </section>
-          <div className="home-divider" aria-hidden="true"></div>
-          <section className="home-about">
-            <div className="home-section__header">
-              <h2 className="home-section__title home-section__title--scribble font-title">
-                About VAKES
-              </h2>
-            </div>
-            <div className="home-about__grid">
-              {aboutSection.image_url ? (
-                <div className="home-about__media">
-                  <img
-                    src={aboutSection.image_url}
-                    alt="VAKES studio"
-                    onContextMenu={preventContextMenu}
-                    onDragStart={preventDragStart}
-                    onCopy={preventCopy}
-                    onCut={preventCopy}
-                    draggable={false}
-                  />
-                </div>
-              ) : null}
-              <div className="home-about__content">
-                <p className="home-about__bio">{aboutSection.bio}</p>
-                <div className="home-about__meta">
-                  <div>
-                    <p className="home-about__label">Team</p>
-                    <ul>
-                      {(aboutSection.team || []).map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="home-about__label">Partners</p>
-                    <ul>
-                      {(aboutSection.partners || []).map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-                {(aboutSection.blog_links || []).length > 0 && (
-                  <div className="home-about__links">
-                    <p className="home-about__label">Journal</p>
-                    <ul>
-                      {aboutSection.blog_links.map((link) => (
-                        <li key={link}>
-                          <a href={link} target="_blank" rel="noreferrer">
-                            {link}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <div className="home-about__socials">
-                  <p className="home-about__label">Socials</p>
-                  <ul>
-                    {site.instagram_url && (
-                      <li>
-                        <a
-                          href={site.instagram_url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <svg
-                            viewBox="0 0 24 24"
-                            role="img"
-                            aria-hidden="true"
-                          >
-                            <path d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H7zm5 3.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6zm0 1.8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm4.6-.7a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z" />
-                          </svg>
-                          Instagram
-                        </a>
-                      </li>
-                    )}
-                    {site.tiktok_url && (
-                      <li>
-                        <a
-                          href={site.tiktok_url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M14 3a6.2 6.2 0 0 0 4.4 1.8V7a7.9 7.9 0 0 1-4.4-1.4v7.2a5.8 5.8 0 1 1-5-5.7v2.3a3.5 3.5 0 1 0 2.7 3.4V3h2.3z" />
-                          </svg>
-                          TikTok
-                        </a>
-                      </li>
-                    )}
-                    {site.youtube_url && (
-                      <li>
-                        <a
-                          href={site.youtube_url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C17.9 5 12 5 12 5s-5.9 0-7.7.3a2.7 2.7 0 0 0-1.9 1.9A28.5 28.5 0 0 0 2 12a28.5 28.5 0 0 0 .4 4.8 2.7 2.7 0 0 0 1.9 1.9c1.8.3 7.7.3 7.7.3s5.9 0 7.7-.3a2.7 2.7 0 0 0 1.9-1.9A28.5 28.5 0 0 0 22 12a28.5 28.5 0 0 0-.4-4.8zM10 15.4V8.6L15.6 12 10 15.4z" />
-                          </svg>
-                          YouTube
-                        </a>
-                      </li>
-                    )}
-                    {behanceUrl && (
-                      <li>
-                        <a href={behanceUrl} target="_blank" rel="noreferrer">
-                          <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M8.8 11.4c1.5-.1 2.6-1 2.6-2.6 0-2-1.4-3-4-3H2v12h5.7c2.8 0 4.6-1.2 4.6-3.6 0-2-1.2-3.1-2.5-3.4zM4.4 7.6h2.6c1.1 0 1.8.4 1.8 1.4 0 1.1-.7 1.5-1.9 1.5H4.4V7.6zm2.8 8.2H4.4v-3.4h2.9c1.3 0 2.2.6 2.2 1.7 0 1.3-.9 1.7-2.2 1.7zM19.1 9.2c-2.3 0-4 1.6-4 4.3 0 2.8 1.6 4.4 4.2 4.4 2 0 3.3-1 3.7-2.6h-2c-.2.5-.7.9-1.7.9-1.2 0-1.9-.7-2-2h5.9c.1-2.9-1.3-5-4.1-5zm-2 3.4c.1-1 .8-1.7 1.9-1.7 1.1 0 1.7.6 1.8 1.7h-3.7zM16.6 6.5h4.8V5.2h-4.8v1.3z" />
-                          </svg>
-                          Behance
-                        </a>
-                      </li>
-                    )}
-                    {dribbbleUrl && (
-                      <li>
-                        <a href={dribbbleUrl} target="_blank" rel="noreferrer">
-                          <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm6.5 5.3a8.3 8.3 0 0 1 1.8 4.7 14.5 14.5 0 0 0-6-.1c-.2-.5-.4-.9-.6-1.4a10.7 10.7 0 0 0 4.8-3.2ZM12 3.8a8.1 8.1 0 0 1 5.2 1.9 9.2 9.2 0 0 1-4.4 2.8A36.9 36.9 0 0 0 9.6 4a8.2 8.2 0 0 1 2.4-.2Zm-4.2 1a35.5 35.5 0 0 1 3.2 4.4A30.8 30.8 0 0 1 3.8 10 8.3 8.3 0 0 1 7.8 4.8ZM3.7 12a8.7 8.7 0 0 1 .1-1.3 33.6 33.6 0 0 0 8.1-1.1c.2.4.4.8.6 1.2a13.7 13.7 0 0 0-5.7 6.6A8.3 8.3 0 0 1 3.7 12Zm8.3 8.3a8.1 8.1 0 0 1-4.2-1.2 11.8 11.8 0 0 1 5.3-6.1 24.6 24.6 0 0 1 1.4 5.3 8.1 8.1 0 0 1-2.5 2Zm4-.9a26.3 26.3 0 0 0-1.2-4.7 12.7 12.7 0 0 1 5 .2 8.3 8.3 0 0 1-3.8 4.5Z" />
-                          </svg>
-                          Dribbble
-                        </a>
-                      </li>
-                    )}
-                  </ul>
-                </div>
-                <div className="home-about__contact">
-                  <a href={`mailto:${aboutSection.email}`}>{aboutSection.email}</a>
-                  <span>{aboutSection.phone}</span>
-                </div>
-              </div>
+                  })}
+                  <Link data-animate to="/about" className="reveal portal-card">
+                    <div className="portal-card__text">
+                      <div className="portal-card__meta">About</div>
+                      <h2 className="portal-card__title font-title">About VAKES</h2>
+                    </div>
+                    <span className="portal-card__glow" aria-hidden="true"></span>
+                  </Link>
+                </nav>
+              </aside>
             </div>
           </section>
         </div>
@@ -4537,6 +4593,16 @@ export default function App() {
           <div className="portal-page__body">
             {renderPortalContent(routePortal.portal, routePortal.index)}
           </div>
+        </section>
+      )}
+
+      {isAboutRoute && !routePortal && (
+        <section className="portal-page portal-page--about">
+          <div className="portal-page__header">
+            <p className="portal-page__meta">About</p>
+            <h1 className="portal-page__title font-title">About VAKES</h1>
+          </div>
+          <div className="portal-page__body">{renderAboutSection(false)}</div>
         </section>
       )}
 
@@ -4877,6 +4943,35 @@ export default function App() {
         </div>
       )}
 
+      {workModalOpen && workPortalEntry && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={() => setWorkModalOpen(false)}
+        >
+          <div
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Work with VAKES"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="modal__close"
+              onClick={() => setWorkModalOpen(false)}
+            >
+              Close
+            </button>
+            <div className="modal__meta">Work with VAKES</div>
+            <div className="modal__title">Start a Project</div>
+            <div className="modal__body">
+              {renderPortalContent(workPortalEntry.portal, workPortalEntry.index)}
+            </div>
+          </div>
+        </div>
+      )}
+
       {resumeOpen && (
         <div
           className="modal-backdrop"
@@ -5187,7 +5282,6 @@ export default function App() {
         }`}
         aria-hidden="true"
       >
-        <span className="custom-cursor__text">GO</span>
       </div>
 
       <footer className="mt-9 text-center text-[0.75rem] text-black/70">

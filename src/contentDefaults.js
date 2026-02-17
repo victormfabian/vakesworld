@@ -183,7 +183,7 @@ export const DEFAULT_SHOP = {
       images: [],
       description: '',
       sizes: ['S', 'M', 'L', 'XL'],
-      category: 'clothing',
+      category: 'apparel',
     },
     {
       title: 'Canvas Tote',
@@ -212,6 +212,7 @@ export const DEFAULT_PORTALS = [
     title: 'Start a Project',
     href: '#',
     sort_order: 1,
+    illustration_url: 'https://placehold.co/140x140/png?text=Work',
     work_form: DEFAULT_WORK_WITH_ME,
   },
   {
@@ -220,6 +221,7 @@ export const DEFAULT_PORTALS = [
     title: 'Creative Systems',
     href: '#',
     sort_order: 2,
+    illustration_url: 'https://placehold.co/140x140/png?text=Services',
     services: [
       {
         title: 'Branding',
@@ -253,6 +255,7 @@ export const DEFAULT_PORTALS = [
     title: 'Apps & SaaS',
     href: '#',
     sort_order: 3,
+    illustration_url: 'https://placehold.co/140x140/png?text=Ideas',
   },
   {
     id: 4,
@@ -260,6 +263,7 @@ export const DEFAULT_PORTALS = [
     title: 'Objects & Editions',
     href: '#',
     sort_order: 4,
+    illustration_url: 'https://placehold.co/140x140/png?text=Shop',
     shop: DEFAULT_SHOP,
   },
   {
@@ -268,5 +272,6 @@ export const DEFAULT_PORTALS = [
     title: 'Victor M Fabian',
     href: '#',
     sort_order: 5,
+    illustration_url: 'https://placehold.co/140x140/png?text=Portfolio',
   },
 ]
