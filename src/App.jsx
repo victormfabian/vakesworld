@@ -108,6 +108,7 @@ export default function App() {
   const [activeSuccessKitTab, setActiveSuccessKitTab] = useState('all')
   const [aboutModalOpen, setAboutModalOpen] = useState(false)
   const [activeServiceTab, setActiveServiceTab] = useState('all')
+  const [activeServiceNicheTab, setActiveServiceNicheTab] = useState('all')
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
@@ -148,8 +149,10 @@ export default function App() {
   const [workFormContext, setWorkFormContext] = useState('portal')
   const [portfolioCallOpen, setPortfolioCallOpen] = useState(false)
   const [workModalOpen, setWorkModalOpen] = useState(false)
-  const [cardsVisible, setCardsVisible] = useState(false)
+  const [workModalStep, setWorkModalStep] = useState(1)
   const [resumeOpen, setResumeOpen] = useState(false)
+  const [homeServicesView, setHomeServicesView] = useState('services')
+  const [openHomeFaqIndex, setOpenHomeFaqIndex] = useState(null)
   const [activeNavCardIndex, setActiveNavCardIndex] = useState(0)
   const [currentTime, setCurrentTime] = useState(
     new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
@@ -157,6 +160,9 @@ export default function App() {
   const todayDate = new Date().toISOString().slice(0, 10)
   const [cursorVisible, setCursorVisible] = useState(false)
   const [cursorActive, setCursorActive] = useState(false)
+  const [cursorOnDark, setCursorOnDark] = useState(false)
+  const [cursorOnAccent, setCursorOnAccent] = useState(false)
+  const [cursorOnHeroButton, setCursorOnHeroButton] = useState(false)
 
   const isSuccessKitPortal = (portal) => {
     const meta = portal?.meta?.toLowerCase() || ''
@@ -248,6 +254,13 @@ export default function App() {
     return `${year}-${month}-${day}`
   }
 
+  const formatBlogPublishedDate = (date = new Date()) =>
+    date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+
   const parseDateValue = (value) =>
     value ? new Date(`${value}T00:00:00`) : null
 
@@ -306,13 +319,100 @@ export default function App() {
   const getServicesFromPortal = (portal) =>
     portal?.services?.length ? portal.services : DEFAULT_SERVICES
 
-  const getServiceTabs = (services) => [
-    { key: 'all', label: 'All' },
-    ...services.map((service, index) => ({
-      key: getServiceKey(service, index),
-      label: service?.title || `Service ${index + 1}`,
+  const getProjectSelectorValue = (service) =>
+    (service?.service_selector || '').trim()
+
+  const DEFAULT_PROJECT_NICHES = [
+    'Enterprise software',
+    'Foodtech',
+    'Fintech',
+    'Education',
+    'Social media',
+    'Real estate',
+    'Sport',
+    'Healthcare',
+    'Transport',
+    'Retail',
+  ]
+
+  const getServiceNicheValues = (service) => {
+    if (Array.isArray(service?.niches) && service.niches.length) {
+      return service.niches
+        .map((value) => (value || '').trim())
+        .filter(Boolean)
+    }
+    const legacyNiche = (service?.niche || '').trim()
+    return legacyNiche ? [legacyNiche] : []
+  }
+
+  const getProjectSelectorsFromPortal = (portal, services) => {
+    if (Array.isArray(portal?.project_selectors) && portal.project_selectors.length) {
+      return portal.project_selectors
+        .map((value) => (value || '').trim())
+        .filter(Boolean)
+    }
+    const seen = new Set()
+    const fallback = []
+    services.forEach((service) => {
+      const label = getProjectSelectorValue(service)
+      const key = slugify(label)
+      if (!key || seen.has(key)) {
+        return
+      }
+      seen.add(key)
+      fallback.push(label)
+    })
+    return fallback
+  }
+
+  const getNicheSelectorsFromPortal = (portal, services) => {
+    if (Array.isArray(portal?.niche_selectors) && portal.niche_selectors.length) {
+      return portal.niche_selectors
+        .map((value) => (value || '').trim())
+        .filter(Boolean)
+    }
+    const seen = new Set()
+    const tabs = []
+    DEFAULT_PROJECT_NICHES.forEach((label) => {
+      const key = slugify(label)
+      if (!seen.has(key)) {
+        seen.add(key)
+        tabs.push(label)
+      }
+    })
+    services.forEach((service) => {
+      getServiceNicheValues(service).forEach((label) => {
+        const key = slugify(label)
+        if (!key || seen.has(key)) {
+          return
+        }
+        seen.add(key)
+        tabs.push(label)
+      })
+    })
+    return tabs
+  }
+
+  const getServiceTabs = (projectSelectors) => [
+    { key: 'all', label: 'All projects' },
+    ...projectSelectors.map((label, index) => ({
+      key: slugify(label) || `project-selector-${index + 1}`,
+      label,
     })),
   ]
+
+  const getServiceNicheTabs = (nicheSelectors) => {
+    const seen = new Set()
+    const tabs = [{ key: 'all', label: 'All niches' }]
+    nicheSelectors.forEach((label, index) => {
+      const key = slugify(label) || `niche-selector-${index + 1}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        tabs.push({ key, label })
+      }
+    })
+    return tabs
+  }
 
   const portalRoutes = useMemo(
     () =>
@@ -321,7 +421,7 @@ export default function App() {
         if (isSuccessKitPortal(portal)) {
           slug = 'success-kit'
         } else if (isServicesPortal(portal)) {
-          slug = 'services'
+          slug = 'projects'
         } else if (isShopPortal(portal)) {
           slug = 'shop'
         } else if (isWorkWithMePortal(portal)) {
@@ -343,10 +443,17 @@ export default function App() {
 
   const routeSlug = location.pathname.replace(/^\/+|\/+$/g, '')
   const routePortal = routeSlug
-    ? portalRoutes.find((item) => item.slug === routeSlug) || null
+    ? portalRoutes.find((item) => item.slug === routeSlug) ||
+      (routeSlug === 'services'
+        ? portalRoutes.find((item) => item.slug === 'projects') || null
+        : null)
     : null
   const activeContentPortal = routePortal?.portal || null
   const isAboutRoute = routeSlug === 'about'
+  const isBlogRoute = routeSlug === 'blog' || routeSlug.startsWith('blog/')
+  const blogPostSlug = routeSlug.startsWith('blog/')
+    ? routeSlug.slice('blog/'.length)
+    : ''
   const isPortfolioRoute = routeSlug === 'victormfabian'
   const isPortfolioView =
     isPortfolioRoute || (routePortal && isPortfolioPortal(routePortal.portal))
@@ -354,6 +461,10 @@ export default function App() {
   const workPortalEntry = portalRoutes.find((item) =>
     isWorkWithMePortal(item.portal)
   )
+  const servicesPortalEntry = portalRoutes.find((item) =>
+    isServicesPortal(item.portal)
+  )
+  const workModalPortal = workPortalEntry?.portal || activeContentPortal || {}
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -491,16 +602,65 @@ export default function App() {
       return
     }
 
+    const getBackgroundRgb = (startElement) => {
+      let element = startElement
+      while (element && element instanceof Element) {
+        const background = window.getComputedStyle(element).backgroundColor || ''
+        const match = background.match(
+          /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/
+        )
+        if (match) {
+          const alpha = match[4] === undefined ? 1 : Number(match[4])
+          if (alpha > 0) {
+            return {
+              r: Number(match[1]),
+              g: Number(match[2]),
+              b: Number(match[3]),
+            }
+          }
+        }
+        element = element.parentElement
+      }
+      return { r: 255, g: 255, b: 255 }
+    }
+
+    const isDarkBackground = (rgb) => {
+      const luminance = 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b
+      return luminance < 145
+    }
+
+    const isAccentBackground = (rgb) => {
+      const accent = { r: 255, g: 222, b: 0 }
+      const distance = Math.sqrt(
+        (rgb.r - accent.r) ** 2 + (rgb.g - accent.g) ** 2 + (rgb.b - accent.b) ** 2
+      )
+      return distance < 85
+    }
+
     const handleMove = (event) => {
       cursor.style.setProperty('--cursor-x', `${event.clientX}px`)
       cursor.style.setProperty('--cursor-y', `${event.clientY}px`)
+      const hovered = document.elementFromPoint(event.clientX, event.clientY)
+      const rgb = hovered instanceof Element ? getBackgroundRgb(hovered) : { r: 255, g: 255, b: 255 }
+      const onAccent = hovered instanceof Element && isAccentBackground(rgb)
+      const onDark = hovered instanceof Element && !onAccent && isDarkBackground(rgb)
+      const onHeroButton =
+        hovered instanceof Element && Boolean(hovered.closest('.hero-card__cta'))
+      setCursorOnAccent(onAccent)
+      setCursorOnDark(onDark)
+      setCursorOnHeroButton(onHeroButton)
       if (!cursorVisible) {
         setCursorVisible(true)
       }
     }
 
     const handleEnter = () => setCursorVisible(true)
-    const handleLeave = () => setCursorVisible(false)
+    const handleLeave = () => {
+      setCursorVisible(false)
+      setCursorOnDark(false)
+      setCursorOnAccent(false)
+      setCursorOnHeroButton(false)
+    }
 
     const handleHover = (event) => {
       const target = event.target
@@ -511,6 +671,7 @@ export default function App() {
         'a, button, input, textarea, select, [role="button"], .portal-card__title-link, .shop-card'
       )
       setCursorActive(Boolean(isClickable))
+      setCursorOnHeroButton(Boolean(target.closest('.hero-card__cta')))
     }
 
     window.addEventListener('mousemove', handleMove, { passive: true })
@@ -607,6 +768,10 @@ export default function App() {
     const portfolioProfile = getPortfolioSection(site)
     const pageLabel = isAboutRoute
       ? 'About'
+      : blogPostSlug && activeBlogPost
+        ? activeBlogPost.title
+        : isBlogRoute
+          ? 'Blog'
       : routePortal?.portal?.meta ||
         routePortal?.portal?.title ||
         (isPortfolioRoute ? portfolioProfile.name : '')
@@ -617,7 +782,13 @@ export default function App() {
     const portfolioDescription = `${portfolioProfile.title}. ${portfolioProfile.summary}`
     const pageDescription = pageLabel
       ? [
-          isAboutRoute ? aboutSection?.bio : routePortal?.portal?.title,
+          isAboutRoute
+            ? aboutSection?.bio
+            : blogPostSlug && activeBlogPost
+              ? activeBlogPost.excerpt || activeBlogPost.content
+              : isBlogRoute
+                ? 'Stories, experiments, and ideas from VAKES.'
+                : routePortal?.portal?.title,
           isPortfolioRoute ? portfolioDescription : heroLine,
         ]
           .filter(Boolean)
@@ -634,7 +805,7 @@ export default function App() {
     setMetaProperty('twitter:title', pageTitle)
     setMetaProperty('twitter:description', pageDescription)
     setCanonical(pageUrl)
-  }, [location.pathname, routePortal, site])
+  }, [location.pathname, routePortal, site, isBlogRoute, blogPostSlug])
 
   useEffect(() => {
     if (isAdminView) {
@@ -843,10 +1014,171 @@ export default function App() {
 
   const getAboutSection = (siteData) =>
     siteData.about_section
-      ? { ...DEFAULT_ABOUT, ...siteData.about_section }
+      ? {
+          ...DEFAULT_ABOUT,
+          ...siteData.about_section,
+          service_segments: {
+            ...DEFAULT_ABOUT.service_segments,
+            ...(siteData.about_section?.service_segments || {}),
+          },
+          service_tech_stacks: Array.isArray(
+            siteData.about_section?.service_tech_stacks
+          )
+            ? siteData.about_section.service_tech_stacks
+            : DEFAULT_ABOUT.service_tech_stacks,
+          faq_items: Array.isArray(siteData.about_section?.faq_items)
+            ? siteData.about_section.faq_items
+            : DEFAULT_ABOUT.faq_items,
+        }
       : DEFAULT_ABOUT
 
+  const normalizeBlogPostsForSave = (blogPosts = []) =>
+    (Array.isArray(blogPosts) ? blogPosts : [])
+      .map((post, index) => {
+        const title = (post?.title || '').trim() || `Post ${index + 1}`
+        const slug = slugify(title) || `post-${index + 1}`
+        return {
+          title,
+          slug,
+          excerpt: (post?.excerpt || '').trim(),
+          content: post?.content || '',
+          cover_image: (post?.cover_image || '').trim(),
+          published_at: (post?.published_at || '').trim() || formatBlogPublishedDate(),
+        }
+      })
+      .filter((post) => post.slug)
+
+  const getBlogPosts = (siteData) => {
+    const aboutData = getAboutSection(siteData)
+    return normalizeBlogPostsForSave(aboutData.blog_posts).map((post) => ({
+      ...post,
+      id: post.slug,
+    }))
+  }
+
   const aboutSection = getAboutSection(site)
+  const blogPosts = getBlogPosts(site)
+  const homeServiceTechStacks = useMemo(() => {
+    const stacks = Array.isArray(getAboutSection(site).service_tech_stacks)
+      ? getAboutSection(site).service_tech_stacks
+      : []
+    const cleaned = stacks.map((item) => (item || '').trim()).filter(Boolean)
+    if (cleaned.length) {
+      return cleaned
+    }
+    return ['Electron', 'Node.js', 'JavaScript', 'React Native', 'Flutter']
+  }, [site])
+  const homeFaqItems = useMemo(() => {
+    const items = Array.isArray(getAboutSection(site).faq_items)
+      ? getAboutSection(site).faq_items
+      : []
+    const cleaned = items
+      .map((item) => ({
+        question: (item?.question || '').trim(),
+        answer: (item?.answer || '').trim(),
+      }))
+      .filter((item) => item.question)
+    return cleaned.length ? cleaned : DEFAULT_ABOUT.faq_items
+  }, [site])
+  const homeServiceRows = useMemo(() => {
+    if (!servicesPortalEntry?.portal) {
+      return []
+    }
+
+    const analyticsFallback = [
+      'UI/UX audit',
+      'Discovery phase',
+      'System analysis',
+    ]
+    const designFallback = [
+      'UI/UX design',
+      'Web design',
+      'Mobile app design',
+      'Website redesign',
+    ]
+    const developmentFallback = [
+      'Mobile app development',
+      'Web development',
+      'Custom software development',
+      'Cross-platform development',
+      'MVP',
+      'iOS',
+      'Android',
+      'Desktop',
+    ]
+
+    const bucketMap = {
+      analytics: [],
+      design: [],
+      development: [],
+    }
+
+    const manualSegments = getAboutSection(site).service_segments || {}
+    const manualAnalytics = Array.isArray(manualSegments.analytics)
+      ? manualSegments.analytics.map((item) => (item || '').trim()).filter(Boolean)
+      : []
+    const manualDesign = Array.isArray(manualSegments.design)
+      ? manualSegments.design.map((item) => (item || '').trim()).filter(Boolean)
+      : []
+    const manualDevelopment = Array.isArray(manualSegments.development)
+      ? manualSegments.development.map((item) => (item || '').trim()).filter(Boolean)
+      : []
+
+    if (manualAnalytics.length || manualDesign.length || manualDevelopment.length) {
+      return [
+        { label: 'Analytics', items: manualAnalytics },
+        { label: 'Design', items: manualDesign },
+        { label: 'Development', items: manualDevelopment },
+      ]
+    }
+
+    const services = getServicesFromPortal(servicesPortalEntry.portal)
+    services.forEach((service, index) => {
+      const selectorText = getProjectSelectorValue(service).toLowerCase()
+      const titleText = (service?.title || '').toLowerCase()
+      const descriptionText = (service?.description || '').toLowerCase()
+      const combined = `${selectorText} ${titleText} ${descriptionText}`
+      const chipLabel = (service?.title || '').trim() || `Service ${index + 1}`
+
+      if (/(audit|analysis|analytic|discovery|research|strategy|system)/.test(combined)) {
+        if (!bucketMap.analytics.includes(chipLabel)) {
+          bucketMap.analytics.push(chipLabel)
+        }
+        return
+      }
+
+      if (/(design|ui|ux|brand|visual|redesign|prototype)/.test(combined)) {
+        if (!bucketMap.design.includes(chipLabel)) {
+          bucketMap.design.push(chipLabel)
+        }
+        return
+      }
+
+      if (!bucketMap.development.includes(chipLabel)) {
+        bucketMap.development.push(chipLabel)
+      }
+    })
+
+    return [
+      {
+        label: 'Analytics',
+        items: bucketMap.analytics.length ? bucketMap.analytics : analyticsFallback,
+      },
+      {
+        label: 'Design',
+        items: bucketMap.design.length ? bucketMap.design : designFallback,
+      },
+      {
+        label: 'Development',
+        items: bucketMap.development.length
+          ? bucketMap.development
+          : developmentFallback,
+      },
+    ]
+  }, [servicesPortalEntry, site])
+  const activeBlogPost = blogPostSlug
+    ? blogPosts.find((post) => post.slug === blogPostSlug) || null
+    : null
   const behanceUrl = site.behance_url || aboutSection.behance_url
   const dribbbleUrl = site.dribbble_url || aboutSection.dribbble_url
   const heroMediaUrl = resolveHeroMediaUrl(site.logo_url)
@@ -1078,6 +1410,7 @@ export default function App() {
       about_section: {
         ...DEFAULT_ABOUT,
         ...(draftSite.about_section || {}),
+        blog_posts: normalizeBlogPostsForSave(draftSite.about_section?.blog_posts),
         behance_url:
           draftSite.behance_url || draftSite.about_section?.behance_url || '',
         dribbble_url:
@@ -1123,6 +1456,12 @@ export default function App() {
       illustration_url: portal.illustration_url || '',
       sort_order: index + 1,
       services: portal.services || null,
+      project_selectors: Array.isArray(portal.project_selectors)
+        ? portal.project_selectors.map((item) => (item || '').trim()).filter(Boolean)
+        : null,
+      niche_selectors: Array.isArray(portal.niche_selectors)
+        ? portal.niche_selectors.map((item) => (item || '').trim()).filter(Boolean)
+        : null,
       success_kit: portal.success_kit || null,
       shop: portal.shop || null,
       work_form: portal.work_form || null,
@@ -1132,9 +1471,14 @@ export default function App() {
       .from('portals')
       .upsert(portalPayload, { onConflict: 'id' })
 
-    if (portalError && portalError.message.includes('illustration_url')) {
+    if (
+      portalError &&
+      (portalError.message.includes('illustration_url') ||
+        portalError.message.includes('project_selectors') ||
+        portalError.message.includes('niche_selectors'))
+    ) {
       const fallbackPayload = portalPayload.map(
-        ({ illustration_url, ...rest }) => rest
+        ({ illustration_url, project_selectors, niche_selectors, ...rest }) => rest
       )
       const fallbackResult = await supabase
         .from('portals')
@@ -1142,7 +1486,7 @@ export default function App() {
       portalError = fallbackResult.error
       if (!portalError) {
         setStatus(
-          'Saved without illustration_url column. Add it to portals table to store images.'
+          'Saved with fallback columns removed. Add missing columns (illustration_url/project_selectors/niche_selectors) to portals to persist those fields.'
         )
       }
     }
@@ -1214,7 +1558,15 @@ export default function App() {
     const portal = nextPortals[portalIndex]
     const services =
       portal.services?.length ? [...portal.services] : [...DEFAULT_SERVICES]
-    services.push({ title: '', description: '', image: '' })
+    services.push({
+      title: '',
+      service_selector: '',
+      niche_selector: '',
+      niches: [],
+      description: '',
+      image: '',
+      media: [],
+    })
     nextPortals[portalIndex] = { ...portal, services }
     setDraftPortals(nextPortals)
   }
@@ -1364,6 +1716,96 @@ export default function App() {
     const experience = [...current.experience]
     experience.splice(index, 1)
     updatePortfolioSection({ experience })
+  }
+
+  const handleBlogPostChange = (index, field, value) => {
+    const aboutData = getAboutSection(draftSite)
+    const posts = Array.isArray(aboutData.blog_posts) ? [...aboutData.blog_posts] : []
+    const current = posts[index] || {}
+    posts[index] = { ...current, [field]: value }
+    if (field === 'title') {
+      posts[index].slug = slugify(value)
+    }
+    setDraftSite({
+      ...draftSite,
+      about_section: {
+        ...aboutData,
+        blog_posts: posts,
+      },
+    })
+  }
+
+  const handleAddBlogPost = () => {
+    const aboutData = getAboutSection(draftSite)
+    const posts = Array.isArray(aboutData.blog_posts) ? [...aboutData.blog_posts] : []
+    posts.push({
+      title: '',
+      slug: '',
+      excerpt: '',
+      content: '',
+      cover_image: '',
+      published_at: formatBlogPublishedDate(),
+    })
+    setDraftSite({
+      ...draftSite,
+      about_section: {
+        ...aboutData,
+        blog_posts: posts,
+      },
+    })
+  }
+
+  const handleRemoveBlogPost = (index) => {
+    const aboutData = getAboutSection(draftSite)
+    const posts = Array.isArray(aboutData.blog_posts) ? [...aboutData.blog_posts] : []
+    posts.splice(index, 1)
+    setDraftSite({
+      ...draftSite,
+      about_section: {
+        ...aboutData,
+        blog_posts: posts,
+      },
+    })
+  }
+
+  const handleFaqItemChange = (index, field, value) => {
+    const aboutData = getAboutSection(draftSite)
+    const items = Array.isArray(aboutData.faq_items) ? [...aboutData.faq_items] : []
+    const current = items[index] || { question: '', answer: '' }
+    items[index] = { ...current, [field]: value }
+    setDraftSite({
+      ...draftSite,
+      about_section: {
+        ...aboutData,
+        faq_items: items,
+      },
+    })
+  }
+
+  const handleAddFaqItem = () => {
+    const aboutData = getAboutSection(draftSite)
+    const items = Array.isArray(aboutData.faq_items) ? [...aboutData.faq_items] : []
+    items.push({ question: '', answer: '' })
+    setDraftSite({
+      ...draftSite,
+      about_section: {
+        ...aboutData,
+        faq_items: items,
+      },
+    })
+  }
+
+  const handleRemoveFaqItem = (index) => {
+    const aboutData = getAboutSection(draftSite)
+    const items = Array.isArray(aboutData.faq_items) ? [...aboutData.faq_items] : []
+    items.splice(index, 1)
+    setDraftSite({
+      ...draftSite,
+      about_section: {
+        ...aboutData,
+        faq_items: items,
+      },
+    })
   }
 
   const preventContextMenu = (event) => {
@@ -1681,30 +2123,108 @@ export default function App() {
     setWorkFormStatus('Request submitted. We will reach out soon.')
   }
 
+  const openWorkModal = () => {
+    setWorkFormContext('portal')
+    setWorkFormError('')
+    setWorkFormStatus('')
+    setWorkFormFieldErrors({})
+    setWorkModalStep(1)
+    setWorkModalOpen(true)
+  }
+
+  const closeWorkModal = () => {
+    setWorkModalOpen(false)
+    setWorkModalStep(1)
+  }
+
+  const getWorkStepFieldErrors = (step) => {
+    const fieldErrors = {}
+    if (step === 1) {
+      if (workFormContext !== 'portfolio' && !workForm.service) fieldErrors.service = true
+      if (!workForm.name.trim()) fieldErrors.name = true
+      if (!workForm.email.trim()) fieldErrors.email = true
+      if (!workForm.phone.trim()) fieldErrors.phone = true
+    }
+    if (step === 2) {
+      if (!workForm.industry) fieldErrors.industry = true
+      if (!workForm.message.trim()) fieldErrors.message = true
+      if (!workForm.meeting_mode) fieldErrors.meeting_mode = true
+    }
+    if (step === 3) {
+      if (!workForm.date) fieldErrors.date = true
+      if (!workForm.time) fieldErrors.time = true
+      if (!workForm.timezone) fieldErrors.timezone = true
+      if (!workForm.agreement) fieldErrors.agreement = true
+    }
+    return fieldErrors
+  }
+
+  const handleNextWorkStep = () => {
+    const fieldErrors = getWorkStepFieldErrors(workModalStep)
+    if (Object.keys(fieldErrors).length > 0) {
+      setWorkFormFieldErrors(fieldErrors)
+      setWorkFormError('Please fill the required fields before continuing.')
+      return
+    }
+    setWorkFormFieldErrors({})
+    setWorkFormError('')
+    setWorkModalStep((prev) => Math.min(3, prev + 1))
+  }
+
   const renderServiceList = (portal) => {
     const services = getServicesFromPortal(portal)
-    const tabs = getServiceTabs(services)
-    const activeKey = tabs.some((tab) => tab.key === activeServiceTab)
+    const projectSelectors = getProjectSelectorsFromPortal(portal, services)
+    const nicheSelectors = getNicheSelectorsFromPortal(portal, services)
+    const projectTabs = getServiceTabs(projectSelectors)
+    const nicheTabs = getServiceNicheTabs(nicheSelectors)
+    const activeProjectKey = projectTabs.some((tab) => tab.key === activeServiceTab)
       ? activeServiceTab
       : 'all'
-    const filteredServices =
-      activeKey === 'all'
+    const activeNicheKey = nicheTabs.some((tab) => tab.key === activeServiceNicheTab)
+      ? activeServiceNicheTab
+      : 'all'
+    const projectFilteredServices =
+      activeProjectKey === 'all'
         ? services
-        : services.filter(
-            (service, index) => getServiceKey(service, index) === activeKey
+        : services.filter((service, index) =>
+            slugify(getProjectSelectorValue(service)) === activeProjectKey
           )
+    const filteredServices =
+      activeNicheKey === 'all'
+        ? projectFilteredServices
+        : projectFilteredServices.filter((service) => {
+            const primaryNiche =
+              (service?.niche_selector || '').trim() ||
+              getServiceNicheValues(service)[0] ||
+              ''
+            return slugify(primaryNiche) === activeNicheKey
+          })
 
     return (
       <div className="service-panel">
-        <div className="service-tabs" role="tablist" aria-label="Services">
-          {tabs.map((tab) => (
+        <div className="service-tabs" role="tablist" aria-label="Projects">
+          {projectTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
-              className={`service-tab${activeKey === tab.key ? ' is-active' : ''}`}
+              className={`service-tab${activeProjectKey === tab.key ? ' is-active' : ''}`}
               onClick={() => setActiveServiceTab(tab.key)}
               role="tab"
-              aria-selected={activeKey === tab.key}
+              aria-selected={activeProjectKey === tab.key}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="service-tabs service-tabs--niches" role="tablist" aria-label="Niches">
+          {nicheTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`service-tab${activeNicheKey === tab.key ? ' is-active' : ''}`}
+              onClick={() => setActiveServiceNicheTab(tab.key)}
+              role="tab"
+              aria-selected={activeNicheKey === tab.key}
             >
               {tab.label}
             </button>
@@ -2706,6 +3226,27 @@ export default function App() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => handleAdminNav('services')}
+                  className={activeAdminPanel === 'services' ? 'is-active' : ''}
+                >
+                  Services
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAdminNav('faqs')}
+                  className={activeAdminPanel === 'faqs' ? 'is-active' : ''}
+                >
+                  FAQs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAdminNav('blog')}
+                  className={activeAdminPanel === 'blog' ? 'is-active' : ''}
+                >
+                  Blog
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleAdminNav('orders')}
                   className={activeAdminPanel === 'orders' ? 'is-active' : ''}
                 >
@@ -3424,6 +3965,248 @@ export default function App() {
                 </div>
               )}
 
+              {activeAdminPanel === 'services' && (
+                <div className="admin__section admin__section--panel">
+                  <h2 className="admin__subtitle">Services Section</h2>
+                  <div className="admin__grid">
+                    <label className="admin__label admin__label--full">
+                      Services Segment: Analytics (comma separated)
+                      <textarea
+                        className="admin__input admin__input--textarea"
+                        value={
+                          (getAboutSection(draftSite).service_segments?.analytics || []).join(', ')
+                        }
+                        onChange={(event) =>
+                          setDraftSite({
+                            ...draftSite,
+                            about_section: {
+                              ...getAboutSection(draftSite),
+                              service_segments: {
+                                ...getAboutSection(draftSite).service_segments,
+                                analytics: event.target.value
+                                  .split(',')
+                                  .map((item) => item.trim())
+                                  .filter(Boolean),
+                              },
+                            },
+                          })
+                        }
+                        rows={3}
+                      />
+                    </label>
+                    <label className="admin__label admin__label--full">
+                      Services Segment: Design (comma separated)
+                      <textarea
+                        className="admin__input admin__input--textarea"
+                        value={(getAboutSection(draftSite).service_segments?.design || []).join(', ')}
+                        onChange={(event) =>
+                          setDraftSite({
+                            ...draftSite,
+                            about_section: {
+                              ...getAboutSection(draftSite),
+                              service_segments: {
+                                ...getAboutSection(draftSite).service_segments,
+                                design: event.target.value
+                                  .split(',')
+                                  .map((item) => item.trim())
+                                  .filter(Boolean),
+                              },
+                            },
+                          })
+                        }
+                        rows={3}
+                      />
+                    </label>
+                    <label className="admin__label admin__label--full">
+                      Services Segment: Development (comma separated)
+                      <textarea
+                        className="admin__input admin__input--textarea"
+                        value={
+                          (getAboutSection(draftSite).service_segments?.development || []).join(
+                            ', '
+                          )
+                        }
+                        onChange={(event) =>
+                          setDraftSite({
+                            ...draftSite,
+                            about_section: {
+                              ...getAboutSection(draftSite),
+                              service_segments: {
+                                ...getAboutSection(draftSite).service_segments,
+                                development: event.target.value
+                                  .split(',')
+                                  .map((item) => item.trim())
+                                  .filter(Boolean),
+                              },
+                            },
+                          })
+                        }
+                        rows={4}
+                      />
+                    </label>
+                    <label className="admin__label admin__label--full">
+                      Services Tech Stacks (comma separated)
+                      <textarea
+                        className="admin__input admin__input--textarea"
+                        value={
+                          (getAboutSection(draftSite).service_tech_stacks || []).join(', ')
+                        }
+                        onChange={(event) =>
+                          setDraftSite({
+                            ...draftSite,
+                            about_section: {
+                              ...getAboutSection(draftSite),
+                              service_tech_stacks: event.target.value
+                                .split(',')
+                                .map((item) => item.trim())
+                                .filter(Boolean),
+                            },
+                          })
+                        }
+                        rows={3}
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {activeAdminPanel === 'faqs' && (
+                <div className="admin__section admin__section--panel">
+                  <div className="admin__section-header">
+                    <h2 className="admin__subtitle">FAQ Items</h2>
+                    <button
+                      type="button"
+                      className="admin__button admin__button--ghost"
+                      onClick={handleAddFaqItem}
+                    >
+                      Add FAQ
+                    </button>
+                  </div>
+                  <div className="admin__list">
+                    {(getAboutSection(draftSite).faq_items || []).map((item, index) => (
+                      <div className="admin__card" key={`faq-item-${index}`}>
+                        <div className="admin__grid">
+                          <label className="admin__label admin__label--full">
+                            Question
+                            <input
+                              className="admin__input"
+                              value={item.question || ''}
+                              onChange={(event) =>
+                                handleFaqItemChange(index, 'question', event.target.value)
+                              }
+                            />
+                          </label>
+                          <label className="admin__label admin__label--full">
+                            Answer
+                            <textarea
+                              className="admin__input admin__input--textarea"
+                              value={item.answer || ''}
+                              onChange={(event) =>
+                                handleFaqItemChange(index, 'answer', event.target.value)
+                              }
+                              rows={3}
+                            />
+                          </label>
+                        </div>
+                        <button
+                          type="button"
+                          className="admin__button admin__button--ghost"
+                          onClick={() => handleRemoveFaqItem(index)}
+                        >
+                          Remove FAQ
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {activeAdminPanel === 'blog' && (
+                <div className="admin__section admin__section--panel">
+                  <div className="admin__section-header">
+                    <h2 className="admin__subtitle">Blog Posts</h2>
+                    <button
+                      type="button"
+                      className="admin__button admin__button--ghost"
+                      onClick={handleAddBlogPost}
+                    >
+                      Add post
+                    </button>
+                  </div>
+                  <div className="admin__list">
+                    {getBlogPosts(draftSite).map((post, index) => (
+                      <div className="admin__card" key={`blog-nav-post-${index}`}>
+                        <div className="admin__grid">
+                          <label className="admin__label">
+                            Title
+                            <input
+                              className="admin__input"
+                              value={post.title}
+                              onChange={(event) =>
+                                handleBlogPostChange(index, 'title', event.target.value)
+                              }
+                            />
+                          </label>
+                          <div className="admin__label">
+                            Slug (auto)
+                            <div className="admin__input">
+                              {slugify(post.title) || 'auto-generated-from-title'}
+                            </div>
+                          </div>
+                          <label className="admin__label">
+                            Uploaded date
+                            <input
+                              className="admin__input"
+                              value={post.published_at}
+                              readOnly
+                            />
+                          </label>
+                          <label className="admin__label">
+                            Cover image URL
+                            <input
+                              className="admin__input"
+                              value={post.cover_image}
+                              onChange={(event) =>
+                                handleBlogPostChange(index, 'cover_image', event.target.value)
+                              }
+                            />
+                          </label>
+                          <label className="admin__label admin__label--full">
+                            Excerpt
+                            <textarea
+                              className="admin__input admin__input--textarea"
+                              value={post.excerpt}
+                              onChange={(event) =>
+                                handleBlogPostChange(index, 'excerpt', event.target.value)
+                              }
+                              rows={2}
+                            />
+                          </label>
+                          <label className="admin__label admin__label--full">
+                            Content
+                            <textarea
+                              className="admin__input admin__input--textarea"
+                              value={post.content}
+                              onChange={(event) =>
+                                handleBlogPostChange(index, 'content', event.target.value)
+                              }
+                              rows={6}
+                            />
+                          </label>
+                        </div>
+                        <button
+                          type="button"
+                          className="admin__button admin__button--ghost"
+                          onClick={() => handleRemoveBlogPost(index)}
+                        >
+                          Remove post
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {activeAdminPanel === 'navigation' && (
                 <div className="admin__section admin__section--panel">
                 <div className="admin__section-header">
@@ -3521,14 +4304,52 @@ export default function App() {
                       </div>
                       {isServicesPortal(portal) && (
                         <div className="admin__services">
+                          <div className="admin__card">
+                            <div className="admin__grid">
+                              <label className="admin__label">
+                                Services selectors (comma separated)
+                                <input
+                                  className="admin__input"
+                                  value={getProjectSelectorsFromPortal(portal, getServicesFromPortal(portal)).join(', ')}
+                                  onChange={(event) =>
+                                    handlePortalChange(
+                                      portalIndex,
+                                      'project_selectors',
+                                      event.target.value
+                                        .split(',')
+                                        .map((value) => value.trim())
+                                        .filter(Boolean)
+                                    )
+                                  }
+                                />
+                              </label>
+                              <label className="admin__label">
+                                Niche selectors (comma separated)
+                                <input
+                                  className="admin__input"
+                                  value={getNicheSelectorsFromPortal(portal, getServicesFromPortal(portal)).join(', ')}
+                                  onChange={(event) =>
+                                    handlePortalChange(
+                                      portalIndex,
+                                      'niche_selectors',
+                                      event.target.value
+                                        .split(',')
+                                        .map((value) => value.trim())
+                                        .filter(Boolean)
+                                    )
+                                  }
+                                />
+                              </label>
+                            </div>
+                          </div>
                           <div className="admin__section-header">
-                            <h3 className="admin__subtitle">Services List</h3>
+                            <h3 className="admin__subtitle">Projects List</h3>
                             <button
                               type="button"
                               className="admin__button admin__button--ghost"
                               onClick={() => handleAddService(portalIndex)}
                             >
-                              Add service
+                              Add project
                             </button>
                           </div>
                           <div className="admin__list">
@@ -3542,7 +4363,7 @@ export default function App() {
                               >
                                 <div className="admin__grid">
                                   <label className="admin__label">
-                                    Service Title
+                                    Project Title
                                     <input
                                       className="admin__input"
                                       value={service.title || ''}
@@ -3552,6 +4373,68 @@ export default function App() {
                                           serviceIndex,
                                           'title',
                                           event.target.value
+                                        )
+                                      }
+                                    />
+                                  </label>
+                                  <label className="admin__label">
+                                    Service selector
+                                    <select
+                                      className="admin__input"
+                                      value={service.service_selector || ''}
+                                      onChange={(event) =>
+                                        handleServiceChange(
+                                          portalIndex,
+                                          serviceIndex,
+                                          'service_selector',
+                                          event.target.value
+                                        )
+                                      }
+                                    >
+                                      <option value="">Select</option>
+                                      {getProjectSelectorsFromPortal(portal, getServicesFromPortal(portal)).map((item) => (
+                                        <option key={item} value={item}>
+                                          {item}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="admin__label">
+                                    Niche selector
+                                    <select
+                                      className="admin__input"
+                                      value={service.niche_selector || ''}
+                                      onChange={(event) =>
+                                        handleServiceChange(
+                                          portalIndex,
+                                          serviceIndex,
+                                          'niche_selector',
+                                          event.target.value
+                                        )
+                                      }
+                                    >
+                                      <option value="">Select</option>
+                                      {getNicheSelectorsFromPortal(portal, getServicesFromPortal(portal)).map((item) => (
+                                        <option key={item} value={item}>
+                                          {item}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="admin__label">
+                                    Niches / Industries (comma separated)
+                                    <input
+                                      className="admin__input"
+                                      value={getServiceNicheValues(service).join(', ')}
+                                      onChange={(event) =>
+                                        handleServiceChange(
+                                          portalIndex,
+                                          serviceIndex,
+                                          'niches',
+                                          event.target.value
+                                            .split(',')
+                                            .map((value) => value.trim())
+                                            .filter(Boolean)
                                         )
                                       }
                                     />
@@ -4302,10 +5185,15 @@ export default function App() {
               </ul>
             </div>
           </div>
-          {(aboutSection.blog_links || []).length > 0 && (
+          {(blogPosts.length > 0 || (aboutSection.blog_links || []).length > 0) && (
             <div className="home-about__links">
               <p className="home-about__label">Journal</p>
               <ul>
+                {blogPosts.map((post) => (
+                  <li key={post.slug}>
+                    <Link to={`/blog/${post.slug}`}>{post.title}</Link>
+                  </li>
+                ))}
                 {aboutSection.blog_links.map((link) => (
                   <li key={link}>
                     <a href={link} target="_blank" rel="noreferrer">
@@ -4380,6 +5268,94 @@ export default function App() {
     </section>
   )
 
+  const renderBlogIndex = () => (
+    <section className="portal-page portal-page--blog">
+      <div className="portal-page__header">
+        <p className="portal-page__meta">Journal</p>
+        <h1 className="portal-page__title font-title">Blog</h1>
+      </div>
+      <div className="portal-page__body">
+        {blogPosts.length ? (
+          <div className="blog-grid">
+            {blogPosts.map((post) => (
+              <Link
+                key={post.slug}
+                to={`/blog/${post.slug}`}
+                className="blog-card"
+              >
+                {post.cover_image ? (
+                  <div className="blog-card__media">
+                    <img src={post.cover_image} alt={post.title} />
+                  </div>
+                ) : null}
+                <div className="blog-card__content">
+                  {post.published_at ? (
+                    <div className="blog-card__meta">{post.published_at}</div>
+                  ) : null}
+                  <h2 className="blog-card__title font-title">{post.title}</h2>
+                  {post.excerpt ? <p className="blog-card__excerpt">{post.excerpt}</p> : null}
+                  <span className="blog-card__read">Read post</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="blog-empty">No blog posts yet.</p>
+        )}
+      </div>
+    </section>
+  )
+
+  const renderBlogPost = () => {
+    if (!activeBlogPost) {
+      return (
+        <section className="portal-page portal-page--blog">
+          <div className="portal-page__header">
+            <p className="portal-page__meta">Journal</p>
+            <h1 className="portal-page__title font-title">Post not found</h1>
+          </div>
+          <div className="portal-page__body">
+            <p className="blog-empty">This blog post does not exist.</p>
+          </div>
+        </section>
+      )
+    }
+
+    return (
+      <section className="portal-page portal-page--blog-post">
+        <div className="portal-page__header">
+          <p className="portal-page__meta">Journal</p>
+          <h1 className="portal-page__title font-title">{activeBlogPost.title}</h1>
+        </div>
+        <div className="portal-page__body blog-post">
+          <Link className="blog-post__back" to="/blog">
+            Back to blog
+          </Link>
+          {activeBlogPost.published_at ? (
+            <div className="blog-post__meta">{activeBlogPost.published_at}</div>
+          ) : null}
+          {activeBlogPost.cover_image ? (
+            <div className="blog-post__media">
+              <img src={activeBlogPost.cover_image} alt={activeBlogPost.title} />
+            </div>
+          ) : null}
+          {activeBlogPost.excerpt ? (
+            <p className="blog-post__excerpt">{activeBlogPost.excerpt}</p>
+          ) : null}
+          <div className="blog-post__content">
+            {(activeBlogPost.content || '')
+              .split('\n')
+              .map((line, index) => line.trim())
+              .filter(Boolean)
+              .map((line, index) => (
+                <p key={`${activeBlogPost.slug}-${index}`}>{line}</p>
+              ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <div
       className="page page--light mx-auto max-w-none px-5 pb-10 pt-6 sm:px-6 sm:pb-16 sm:pt-8 lg:px-16 xl:px-20"
@@ -4392,16 +5368,7 @@ export default function App() {
                 <img src={headerLogoUrl} alt="VAKES" />
               </div>
             )}
-            {!routePortal && !isPortfolioRoute && !isAboutRoute && (
-              <button
-                type="button"
-                className="page-topbar__menu"
-                onClick={() => setCardsVisible((prev) => !prev)}
-              >
-                {cardsVisible ? '✕ Close' : '☰ Menu'}
-              </button>
-            )}
-            {routePortal && (
+            {(routePortal || isAboutRoute || isBlogRoute) && (
               <Link
                 className="page-topbar__back"
                 to="/"
@@ -4427,9 +5394,9 @@ export default function App() {
           </a>
         </div>
       )}
-      {!routePortal && !isPortfolioRoute && !isAboutRoute && (
+      {!routePortal && !isPortfolioRoute && !isAboutRoute && !isBlogRoute && (
         <div className="home-layout">
-          <section className={`home-hero${cardsVisible ? '' : ' home-hero--cards-hidden'}`}>
+          <section className="home-hero">
             <div className="home-hero__panel">
               <div className="hero-wrap">
                 <header className="hero-card">
@@ -4438,6 +5405,20 @@ export default function App() {
                     {site.hero_eyebrow}
                   </h1>
                   <p className="hero-card__tagline">{site.hero_tagline}</p>
+                  <button
+                    type="button"
+                    className="hero-card__cta"
+                    onClick={openWorkModal}
+                  >
+                    <span className="hero-card__cta-track">
+                      <span className="hero-card__cta-label hero-card__cta-label--dark">
+                        Work with Vakes
+                      </span>
+                      <span className="hero-card__cta-label hero-card__cta-label--accent">
+                        Work with Vakes
+                      </span>
+                    </span>
+                  </button>
                   {heroMediaUrl ? (
                     <div className="hero-media mt-4">
                       {getYouTubeEmbedUrl(heroMediaUrl) ? (
@@ -4491,7 +5472,7 @@ export default function App() {
                 </header>
               </div>
             </div>
-            <div className={`home-hero__cards${cardsVisible ? ' is-visible' : ' is-hidden'}`}>
+            <div className="home-hero__cards">
               <aside className="hero-rail">
                 <nav className="portal-grid mt-6 sm:mt-8" aria-label="Primary">
                   {portalsForRail.map((portal, index) => {
@@ -4517,10 +5498,7 @@ export default function App() {
                           className="reveal portal-card portal-card--button"
                           onClick={() => {
                             setWorkFormContext('portal')
-                            setWorkFormError('')
-                            setWorkFormStatus('')
-                            setWorkFormFieldErrors({})
-                            setWorkModalOpen(true)
+                            openWorkModal()
                           }}
                         >
                           {content}
@@ -4554,6 +5532,13 @@ export default function App() {
                       </Link>
                     )
                   })}
+                  <Link data-animate to="/blog" className="reveal portal-card">
+                    <div className="portal-card__text">
+                      <div className="portal-card__meta">Journal</div>
+                      <h2 className="portal-card__title font-title">Blog</h2>
+                    </div>
+                    <span className="portal-card__glow" aria-hidden="true"></span>
+                  </Link>
                   <Link data-animate to="/about" className="reveal portal-card">
                     <div className="portal-card__text">
                       <div className="portal-card__meta">About</div>
@@ -4565,6 +5550,89 @@ export default function App() {
               </aside>
             </div>
           </section>
+          {homeServiceRows.length > 0 && (
+            <section className="home-services" aria-label="Our services">
+              <div className="home-services__switch" role="tablist" aria-label="Services and FAQs">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={homeServicesView === 'services'}
+                  className={`home-services__switch-btn${
+                    homeServicesView === 'services' ? ' is-active' : ''
+                  }`}
+                  onClick={() => setHomeServicesView('services')}
+                >
+                  Our services
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={homeServicesView === 'faq'}
+                  className={`home-services__switch-btn${
+                    homeServicesView === 'faq' ? ' is-active' : ''
+                  }`}
+                  onClick={() => setHomeServicesView('faq')}
+                >
+                  FAQ&apos;s
+                </button>
+              </div>
+              {homeServicesView === 'services' ? (
+                <>
+                  <h2 className="home-services__title font-title">Our services</h2>
+                  <div className="home-services__rows">
+                    {homeServiceRows.map((row) => (
+                      <div className="home-services__row" key={row.label}>
+                        <div className="home-services__label">{row.label}</div>
+                        <div className="home-services__chips">
+                          {row.items.map((item) => (
+                            <span className="home-services__chip" key={`${row.label}-${item}`}>
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="home-services__stacks">
+                    {homeServiceTechStacks.map((stack) => (
+                      <span className="home-services__stack" key={stack}>
+                        {stack}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="home-faq">
+                  <h2 className="home-services__title font-title">FAQ&apos;s</h2>
+                  <div className="home-faq__list">
+                    {homeFaqItems.map((item, index) => {
+                      const isOpen = openHomeFaqIndex === index
+                      return (
+                        <div className="home-faq__item" key={`${item.question}-${index}`}>
+                          <button
+                            type="button"
+                            className="home-faq__question"
+                            onClick={() =>
+                              setOpenHomeFaqIndex((prev) => (prev === index ? null : index))
+                            }
+                            aria-expanded={isOpen}
+                          >
+                            <span>{item.question}</span>
+                            <span className="home-faq__icon" aria-hidden="true">
+                              {isOpen ? '−' : '+'}
+                            </span>
+                          </button>
+                          {isOpen && item.answer ? (
+                            <div className="home-faq__answer">{item.answer}</div>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
         </div>
       )}
 
@@ -4605,6 +5673,10 @@ export default function App() {
           <div className="portal-page__body">{renderAboutSection(false)}</div>
         </section>
       )}
+
+      {isBlogRoute && !blogPostSlug && !routePortal && renderBlogIndex()}
+
+      {isBlogRoute && blogPostSlug && !routePortal && renderBlogPost()}
 
       {isPortfolioRoute && !routePortal && (
         <section className="portal-page portal-page--portfolio">
@@ -4947,7 +6019,7 @@ export default function App() {
         <div
           className="modal-backdrop"
           role="presentation"
-          onClick={() => setWorkModalOpen(false)}
+          onClick={closeWorkModal}
         >
           <div
             className="modal"
@@ -4959,14 +6031,387 @@ export default function App() {
             <button
               type="button"
               className="modal__close"
-              onClick={() => setWorkModalOpen(false)}
+              onClick={closeWorkModal}
             >
               Close
             </button>
-            <div className="modal__meta">Work with VAKES</div>
-            <div className="modal__title">Start a Project</div>
-            <div className="modal__body">
-              {renderPortalContent(workPortalEntry.portal, workPortalEntry.index)}
+            {workModalStep === 1 && (
+              <>
+                <div className="modal__meta">Work with VAKES</div>
+                <div className="modal__title">Start a Project</div>
+              </>
+            )}
+            {workModalStep !== 1 && (
+              <div className="work-form__step">Step {workModalStep} of 3</div>
+            )}
+            <div className="modal__body work-form">
+              {workModalStep === 1 && (
+                <>
+                  <div className="work-form__step">Step 1 of 3</div>
+                  <div className="work-form__grid">
+                    {workFormContext !== 'portfolio' && (
+                      <label
+                        className={`work-form__label${workFormFieldErrors.service ? ' work-form__label--error' : ''}`}
+                      >
+                        Service
+                        <select
+                          className={`work-form__input${workFormFieldErrors.service ? ' work-form__input--error' : ''}`}
+                          value={workForm.service}
+                          onChange={(event) =>
+                            updateWorkFormField('service', event.target.value)
+                          }
+                          required
+                        >
+                          <option value="">Select</option>
+                          {getWorkFormConfig(workModalPortal).services.map((service) => (
+                            <option key={service} value={service}>
+                              {service}
+                            </option>
+                          ))}
+                        </select>
+                        {workFormFieldErrors.service && (
+                          <span className="work-form__hint">Required</span>
+                        )}
+                      </label>
+                    )}
+                    <label
+                      className={`work-form__label${workFormFieldErrors.name ? ' work-form__label--error' : ''}`}
+                    >
+                      Name
+                      <input
+                        className={`work-form__input${workFormFieldErrors.name ? ' work-form__input--error' : ''}`}
+                        value={workForm.name}
+                        onChange={(event) =>
+                          updateWorkFormField('name', event.target.value)
+                        }
+                        required
+                      />
+                      {workFormFieldErrors.name && (
+                        <span className="work-form__hint">Required</span>
+                      )}
+                    </label>
+                    <label
+                      className={`work-form__label${workFormFieldErrors.email ? ' work-form__label--error' : ''}`}
+                    >
+                      Email
+                      <input
+                        className={`work-form__input${workFormFieldErrors.email ? ' work-form__input--error' : ''}`}
+                        type="email"
+                        value={workForm.email}
+                        onChange={(event) =>
+                          updateWorkFormField('email', event.target.value)
+                        }
+                        required
+                      />
+                      {workFormFieldErrors.email && (
+                        <span className="work-form__hint">Required</span>
+                      )}
+                    </label>
+                    <label
+                      className={`work-form__label${workFormFieldErrors.phone ? ' work-form__label--error' : ''}`}
+                    >
+                      Phone number
+                      <input
+                        className={`work-form__input${workFormFieldErrors.phone ? ' work-form__input--error' : ''}`}
+                        value={workForm.phone}
+                        onChange={(event) =>
+                          updateWorkFormField('phone', event.target.value)
+                        }
+                        required
+                      />
+                      {workFormFieldErrors.phone && (
+                        <span className="work-form__hint">Required</span>
+                      )}
+                    </label>
+                  </div>
+                  <div className="work-form__actions">
+                    <button
+                      type="button"
+                      className="work-form__submit"
+                      onClick={handleNextWorkStep}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {workModalStep === 2 && (
+                <>
+                  <div className="work-form__grid">
+                    <label
+                      className={`work-form__label${workFormFieldErrors.industry ? ' work-form__label--error' : ''}`}
+                    >
+                      Profession / Industry
+                      <select
+                        className={`work-form__input${workFormFieldErrors.industry ? ' work-form__input--error' : ''}`}
+                        value={workForm.industry}
+                        onChange={(event) =>
+                          updateWorkFormField('industry', event.target.value)
+                        }
+                        required
+                      >
+                        <option value="">Select</option>
+                        {getWorkFormConfig(workModalPortal).industries.map((industry) => (
+                          <option key={industry} value={industry}>
+                            {industry}
+                          </option>
+                        ))}
+                      </select>
+                      {workFormFieldErrors.industry && (
+                        <span className="work-form__hint">Required</span>
+                      )}
+                    </label>
+                    <label
+                      className={`work-form__label${workFormFieldErrors.meeting_mode ? ' work-form__label--error' : ''}`}
+                    >
+                      Mode of meeting
+                      <select
+                        className={`work-form__input${workFormFieldErrors.meeting_mode ? ' work-form__input--error' : ''}`}
+                        value={workForm.meeting_mode}
+                        onChange={(event) =>
+                          updateWorkFormField('meeting_mode', event.target.value)
+                        }
+                        required
+                      >
+                        <option value="">Select</option>
+                        {getWorkFormConfig(workModalPortal).meeting_modes.map((mode) => (
+                          <option key={mode} value={mode}>
+                            {mode}
+                          </option>
+                        ))}
+                      </select>
+                      {workFormFieldErrors.meeting_mode && (
+                        <span className="work-form__hint">Required</span>
+                      )}
+                    </label>
+                    <label className="work-form__label">
+                      Other
+                      <input
+                        className="work-form__input"
+                        value={workForm.other}
+                        onChange={(event) =>
+                          updateWorkFormField('other', event.target.value)
+                        }
+                      />
+                    </label>
+                    <label
+                      className={`work-form__label work-form__label--full${workFormFieldErrors.message ? ' work-form__label--error' : ''}`}
+                    >
+                      Message
+                      <textarea
+                        className={`work-form__input${workFormFieldErrors.message ? ' work-form__input--error' : ''}`}
+                        value={workForm.message}
+                        onChange={(event) =>
+                          updateWorkFormField('message', event.target.value)
+                        }
+                        rows={4}
+                        required
+                      />
+                      {workFormFieldErrors.message && (
+                        <span className="work-form__hint">Required</span>
+                      )}
+                    </label>
+                  </div>
+                  <div className="work-form__actions">
+                    <button
+                      type="button"
+                      className="work-form__submit work-form__submit--ghost"
+                      onClick={() => {
+                        setWorkFormError('')
+                        setWorkModalStep(1)
+                      }}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      className="work-form__submit"
+                      onClick={handleNextWorkStep}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {workModalStep === 3 && (
+                <>
+                  <div className="schedule-card">
+                    <div className="schedule-card__header">
+                      <div className="schedule-card__title">Booking date</div>
+                      <div className="schedule-card__nav">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCalendarMonth(
+                              (prev) =>
+                                new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+                            )
+                          }
+                          aria-label="Previous month"
+                        >
+                          &#8249;
+                        </button>
+                        <span>{monthLabel}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCalendarMonth(
+                              (prev) =>
+                                new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+                            )
+                          }
+                          aria-label="Next month"
+                        >
+                          &#8250;
+                        </button>
+                      </div>
+                    </div>
+                    <div className="schedule-calendar">
+                      <div className="schedule-calendar__weekdays">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
+                          (day) => (
+                            <span key={day}>{day}</span>
+                          )
+                        )}
+                      </div>
+                      <div className="schedule-calendar__grid">
+                        {calendarDays.map((day, index) => {
+                          const inMonth = day.getMonth() === calendarMonth.getMonth()
+                          const isPast = day < todayDateObj
+                          const value = formatDateValue(day)
+                          const isSelected = workForm.date === value
+                          const isToday = formatDateValue(day) === todayDate
+                          return (
+                            <button
+                              key={`${value}-${index}`}
+                              type="button"
+                              className={`schedule-day${
+                                inMonth ? '' : ' schedule-day--outside'
+                              }${isSelected ? ' schedule-day--selected' : ''}${
+                                isToday ? ' schedule-day--today' : ''
+                              }`}
+                              onClick={() => updateWorkFormField('date', value)}
+                              disabled={!inMonth || isPast}
+                            >
+                              {day.getDate()}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {workFormFieldErrors.date && (
+                        <div className="schedule-card__error">Required</div>
+                      )}
+                    </div>
+                    <div className="schedule-times">
+                      <div className="schedule-times__header">
+                        <div className="schedule-times__label">{selectedDateLabel}</div>
+                        <div className="schedule-times__toggle">
+                          <button
+                            type="button"
+                            className={timeFormat === '12h' ? 'is-active' : ''}
+                            onClick={() => setTimeFormat('12h')}
+                          >
+                            12h
+                          </button>
+                          <button
+                            type="button"
+                            className={timeFormat === '24h' ? 'is-active' : ''}
+                            onClick={() => setTimeFormat('24h')}
+                          >
+                            24h
+                          </button>
+                        </div>
+                      </div>
+                      <div className="schedule-times__list">
+                        {timeSlots.map((slot) => (
+                          <button
+                            key={slot}
+                            type="button"
+                            className={`schedule-time${
+                              workForm.time === slot ? ' is-active' : ''
+                            }`}
+                            onClick={() => updateWorkFormField('time', slot)}
+                          >
+                            {formatTimeLabel(slot)}
+                          </button>
+                        ))}
+                      </div>
+                      {workFormFieldErrors.time && (
+                        <div className="schedule-card__error">Required</div>
+                      )}
+                    </div>
+                    <label
+                      className={`work-form__label${
+                        workFormFieldErrors.timezone ? ' work-form__label--error' : ''
+                      }`}
+                    >
+                      Timezone
+                      <select
+                        className={`work-form__input${
+                          workFormFieldErrors.timezone ? ' work-form__input--error' : ''
+                        }`}
+                        value={workForm.timezone}
+                        onChange={(event) =>
+                          updateWorkFormField('timezone', event.target.value)
+                        }
+                        required
+                      >
+                        <option value="">Select</option>
+                        {getWorkFormConfig(workModalPortal).timezones.map((timezone) => (
+                          <option key={timezone} value={timezone}>
+                            {timezone}
+                          </option>
+                        ))}
+                      </select>
+                      {workFormFieldErrors.timezone && (
+                        <span className="work-form__hint">Required</span>
+                      )}
+                    </label>
+                  </div>
+                  {workFormError && <p className="work-form__error">{workFormError}</p>}
+                  {workFormStatus && (
+                    <p className="work-form__status">{workFormStatus}</p>
+                  )}
+                  <label
+                    className={`work-form__label work-form__checkbox${workFormFieldErrors.agreement ? ' work-form__label--error' : ''}`}
+                  >
+                    <input
+                      className={`work-form__input${workFormFieldErrors.agreement ? ' work-form__input--error' : ''}`}
+                      type="checkbox"
+                      checked={workForm.agreement}
+                      onChange={(event) =>
+                        updateWorkFormField('agreement', event.target.checked)
+                      }
+                      required
+                    />
+                    <span>{getWorkFormConfig(workModalPortal).agreement_label}</span>
+                    {workFormFieldErrors.agreement && (
+                      <span className="work-form__hint">Required</span>
+                    )}
+                  </label>
+                  <div className="work-form__actions">
+                    <button
+                      type="button"
+                      className="work-form__submit work-form__submit--ghost"
+                      onClick={() => {
+                        setWorkFormError('')
+                        setWorkModalStep(2)
+                      }}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      className="work-form__submit"
+                      onClick={handleWorkFormSubmit}
+                    >
+                      Book call
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -5068,6 +6513,13 @@ export default function App() {
                   <div>
                     <h3>Blog</h3>
                     <ul>
+                      {getBlogPosts(site).map((post) => (
+                        <li key={post.slug}>
+                          <Link to={`/blog/${post.slug}`} onClick={() => setAboutModalOpen(false)}>
+                            {post.title}
+                          </Link>
+                        </li>
+                      ))}
                       {(getAboutSection(site).blog_links || []).map((link) => (
                         <li key={link}>
                           <a href={link} target="_blank" rel="noreferrer">
@@ -5279,10 +6731,86 @@ export default function App() {
       <div
         className={`custom-cursor${cursorVisible ? ' is-visible' : ''}${
           cursorActive ? ' is-active' : ''
+        }${cursorOnDark ? ' is-on-dark' : ''}${cursorOnAccent ? ' is-on-accent' : ''}${
+          cursorOnHeroButton ? ' is-hidden-for-hero' : ''
         }`}
         aria-hidden="true"
       >
       </div>
+
+      {(site.instagram_url ||
+        site.tiktok_url ||
+        site.youtube_url ||
+        behanceUrl ||
+        dribbbleUrl) && (
+        <div className="hero-socials hero-socials--below hero-socials--footer" aria-label="Social links">
+          {site.instagram_url && (
+            <a
+              className="hero-socials__pill hero-socials__pill--soft hero-socials__pill--instagram-soft"
+              href={site.instagram_url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H7zm5 3.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6zm0 1.8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm4.6-.7a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z" />
+              </svg>
+              Instagram
+            </a>
+          )}
+          {site.tiktok_url && (
+            <a
+              className="hero-socials__pill hero-socials__pill--soft hero-socials__pill--tiktok-soft"
+              href={site.tiktok_url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 3a6.2 6.2 0 0 0 4.4 1.8V7a7.9 7.9 0 0 1-4.4-1.4v7.2a5.8 5.8 0 1 1-5-5.7v2.3a3.5 3.5 0 1 0 2.7 3.4V3h2.3z" />
+              </svg>
+              TikTok
+            </a>
+          )}
+          {site.youtube_url && (
+            <a
+              className="hero-socials__pill hero-socials__pill--soft hero-socials__pill--youtube-soft"
+              href={site.youtube_url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C17.9 5 12 5 12 5s-5.9 0-7.7.3a2.7 2.7 0 0 0-1.9 1.9A28.5 28.5 0 0 0 2 12a28.5 28.5 0 0 0 .4 4.8 2.7 2.7 0 0 0 1.9 1.9c1.8.3 7.7.3 7.7.3s5.9 0 7.7-.3a2.7 2.7 0 0 0 1.9-1.9A28.5 28.5 0 0 0 22 12a28.5 28.5 0 0 0-.4-4.8zM10 15.4V8.6L15.6 12 10 15.4z" />
+              </svg>
+              YouTube
+            </a>
+          )}
+          {behanceUrl && (
+            <a
+              className="hero-socials__pill hero-socials__pill--soft hero-socials__pill--behance-soft"
+              href={behanceUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8.8 11.4c1.5-.1 2.6-1 2.6-2.6 0-2-1.4-3-4-3H2v12h5.7c2.8 0 4.6-1.2 4.6-3.6 0-2-1.2-3.1-2.5-3.4zM4.4 7.6h2.6c1.1 0 1.8.4 1.8 1.4 0 1.1-.7 1.5-1.9 1.5H4.4V7.6zm2.8 8.2H4.4v-3.4h2.9c1.3 0 2.2.6 2.2 1.7 0 1.3-.9 1.7-2.2 1.7zM19.1 9.2c-2.3 0-4 1.6-4 4.3 0 2.8 1.6 4.4 4.2 4.4 2 0 3.3-1 3.7-2.6h-2c-.2.5-.7.9-1.7.9-1.2 0-1.9-.7-2-2h5.9c.1-2.9-1.3-5-4.1-5zm-2 3.4c.1-1 .8-1.7 1.9-1.7 1.1 0 1.7.6 1.8 1.7h-3.7zM16.6 6.5h4.8V5.2h-4.8v1.3z" />
+              </svg>
+              Behance
+            </a>
+          )}
+          {dribbbleUrl && (
+            <a
+              className="hero-socials__pill hero-socials__pill--soft hero-socials__pill--dribbble-soft"
+              href={dribbbleUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm6.5 5.3a8.3 8.3 0 0 1 1.8 4.7 14.5 14.5 0 0 0-6-.1c-.2-.5-.4-.9-.6-1.4a10.7 10.7 0 0 0 4.8-3.2ZM12 3.8a8.1 8.1 0 0 1 5.2 1.9 9.2 9.2 0 0 1-4.4 2.8A36.9 36.9 0 0 0 9.6 4a8.2 8.2 0 0 1 2.4-.2Zm-4.2 1a35.5 35.5 0 0 1 3.2 4.4A30.8 30.8 0 0 1 3.8 10 8.3 8.3 0 0 1 7.8 4.8ZM3.7 12a8.7 8.7 0 0 1 .1-1.3 33.6 33.6 0 0 0 8.1-1.1c.2.4.4.8.6 1.2a13.7 13.7 0 0 0-5.7 6.6A8.3 8.3 0 0 1 3.7 12Zm8.3 8.3a8.1 8.1 0 0 1-4.2-1.2 11.8 11.8 0 0 1 5.3-6.1 24.6 24.6 0 0 1 1.4 5.3 8.1 8.1 0 0 1-2.5 2Zm4-.9a26.3 26.3 0 0 0-1.2-4.7 12.7 12.7 0 0 1 5 .2 8.3 8.3 0 0 1-3.8 4.5Z" />
+              </svg>
+              Dribbble
+            </a>
+          )}
+        </div>
+      )}
 
       <footer className="mt-9 text-center text-[0.75rem] text-black/70">
         {site.footer_text}
@@ -5290,4 +6818,5 @@ export default function App() {
     </div>
   )
 }
+
 

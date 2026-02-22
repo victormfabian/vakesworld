@@ -4,6 +4,49 @@ export const DEFAULT_ABOUT = {
   team: ['Creative Director', 'Design Lead', 'Engineering'],
   partners: ['Collaborators', 'Studios', 'Brands'],
   blog_links: [],
+  blog_posts: [],
+  service_segments: {
+    analytics: [],
+    design: [],
+    development: [],
+  },
+  service_tech_stacks: [],
+  faq_items: [
+    {
+      question: 'How much does it cost to develop an app?',
+      answer:
+        'Pricing depends on scope, complexity, and timeline. We share a clear estimate after discovery.',
+    },
+    {
+      question: 'How long does it take to build an app?',
+      answer:
+        'Typical delivery ranges from 6 to 16 weeks depending on features and approval cycles.',
+    },
+    {
+      question: 'What do I need to do before starting development?',
+      answer:
+        'Have your goals, target users, and core feature priorities defined. We can help refine the rest.',
+    },
+    {
+      question: 'Do you sign NDAs?',
+      answer: 'Yes. We can sign an NDA before sharing sensitive project information.',
+    },
+    {
+      question: 'Can you work with my in-house team?',
+      answer:
+        'Yes. We collaborate with internal product, design, and engineering teams regularly.',
+    },
+    {
+      question: 'How to ensure your code is high-quality?',
+      answer:
+        'We use code reviews, testing, performance checks, and clear documentation throughout delivery.',
+    },
+    {
+      question: 'Can you hand over the project to my in-house team?',
+      answer:
+        'Yes. We provide source code, docs, and handover support for a smooth transition.',
+    },
+  ],
   email: 'hello@vakes.world',
   phone: '+234 000 000 0000',
   behance_url: '',
